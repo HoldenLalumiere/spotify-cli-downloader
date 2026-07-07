@@ -435,7 +435,7 @@ def print_redirect_credentials_menu():
 			b. Back""").strip()
 	print(menu_lines)
 
-def id_credentials_help():
+def id_credentials_help(): #TODO figure out why this only uses 1 tab, for a-e, and none for 1-9
 	return textwrap.dedent(f"""
 			\t1. Click `Log in`
 			\t2. Log in with your Premium Spotify Account
@@ -461,6 +461,8 @@ def id_credentials_help():
 def secret_credentials_help():
 	return "Click `View client secret`"
 
+#TODO add a print out that the user must click a link after starting for first time (if .cache does not exitst)
+#TODO update env vars after creating the env file
 #TODO modify this menu so that the user selects each thing to set if not the first time?
 def handle_credentials_menu():
 	result = handle_id_credentials_menu()

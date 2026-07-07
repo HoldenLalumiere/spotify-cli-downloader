@@ -48,15 +48,24 @@ load_dotenv()
 SPOTIFY_STREAM_SESSION = None
 SC = None
 
+#TODO add this line in if first time `logging.basicConfig(level=logging.DEBUG)`
+#TODO force the same python packages for all
+#TODO rename tags to metadata
+#TODO add a print out after establishing connection
+#TODO add blue to main menu
 def _get_stream_session(verbosity):
 	"""Returns the current stream session, or builds a fresh one if dropped/idle."""
 	global SPOTIFY_STREAM_SESSION
 	if SPOTIFY_STREAM_SESSION is None or not SPOTIFY_STREAM_SESSION.is_valid():
 		if verbosity != AppVerbosity.LOW:
 			print("\tEstablishing active Spotify streaming connection...")
+
 		auth_token = _get_auth_token()
 		if auth_token:
+			# logging.basicConfig(level=logging.DEBUG) #TODO activate this if credentials.json does not exist, also give auth_token of none, then restart download
 			# Pass the Spotipy token into the librespot session builder
+
+			# SPOTIFY_STREAM_SESSION = Session.Builder().oauth(None).create()
 			SPOTIFY_STREAM_SESSION = Session.Builder().oauth(auth_token).create()
 		else:
 			# Fallback as unauthenticated if no token is passed
