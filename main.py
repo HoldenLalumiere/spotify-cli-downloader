@@ -2,6 +2,7 @@ import os
 import re
 import sys
 import textwrap
+from traceback import print_exc
 from urllib.parse import urlparse
 
 from download import download_url
@@ -435,8 +436,8 @@ def print_redirect_credentials_menu():
 			b. Back""").strip()
 	print(menu_lines)
 
-def id_credentials_help(): #TODO figure out why this only uses 1 tab, for a-e, and none for 1-9
-	return textwrap.dedent(f"""
+def print_id_credentials_help(): #TODO figure out why this only uses 1 tab, for a-e, and none for 1-9
+	print(textwrap.dedent(f"""
 			\t1. Click `Log in`
 			\t2. Log in with your Premium Spotify Account
 			\t3. Click your username
@@ -456,10 +457,10 @@ def id_credentials_help(): #TODO figure out why this only uses 1 tab, for a-e, a
 			\t\te. {c.red("`A private programming sandbox application used for learning REST API integration, authentication flows, and JSON parsing.`")}
 			\t8. Under `Redirect URIs` enter `http://127.0.0.1:8080`
 			\t9. Click `Save`
-			""").strip()
+			""").strip())
 
-def secret_credentials_help():
-	return "Click `View client secret`"
+def print_secret_credentials_help():
+	print("Click `View client secret`")
 
 #TODO add a print out that the user must click a link after starting for first time (if .cache does not exitst)
 #TODO update env vars after creating the env file
@@ -485,7 +486,7 @@ def handle_id_credentials_menu():
 			case "b" | "B" | '' | None:
 				return "back"
 			case "h" | "H":
-				print(id_credentials_help())
+				print_id_credentials_help()
 			case _ if is_valid_spotify_hex(choice):
 				save_to_env("SPOTIPY_CLIENT_ID", choice)
 				print(f"{SAVED} Client ID")
@@ -502,7 +503,7 @@ def handle_secret_credentials_menu():
 			case "b" | "B" | '' | None:
 				return "back"
 			case "h" | "H":
-				print(secret_credentials_help())
+				print_secret_credentials_help()
 			case _ if is_valid_spotify_hex(choice):
 				save_to_env("SPOTIPY_CLIENT_SECRET", choice)
 				print(f"{SAVED} Client Secret")
@@ -534,7 +535,8 @@ def is_valid_spotify_url(url):
 	# 1. Matches either a web URL with subdomains (open, www, play) OR the native spotify: protocol
 	# 2. Ensures a valid media type path (track, album, playlist, artist, show, episode)
 	# 3. Validates the 22-character alphanumeric Spotify ID
-	pattern = r"^(?:(https?://(?:open|www|play)\.spotify\.com/(track|album|playlist|artist|show|episode)/[a-zA-Z0-9]{22}(?:/|\?.*)?)|(spotify:(track|album|playlist|artist|show|episode):[a-zA-Z0-9]{22}))$"
+	pattern = r"^(?:(https?://(?:open|www|play)\.spotify\.com/(track|album|playlist|episode)/[a-zA-Z0-9]{22}(?:/|\?.*)?)|(spotify:(track|album|playlist|artist|show|episode):[a-zA-Z0-9]{22}))$"
+	# pattern = r"^(?:(https?://(?:open|www|play)\.spotify\.com/(track|album|playlist|artist|show|episode)/[a-zA-Z0-9]{22}(?:/|\?.*)?)|(spotify:(track|album|playlist|artist|show|episode):[a-zA-Z0-9]{22}))$"
 	return bool(re.match(pattern, url.strip()))
 
 def is_valid_spotify_hex(token):
@@ -550,8 +552,7 @@ def is_valid_url(url):
 	except Exception:
 		return False
 
-#TODO add option to reset/set credential
-#TODO either input their API info for the program to save, or tell them to write it in determine which is safer
+#TODO add option to reset credential
 #TODO implement artist support ???
 def get_input():
 	if user_prefs["bypass_main_menu"]:

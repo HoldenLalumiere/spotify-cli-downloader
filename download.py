@@ -13,10 +13,12 @@ import threading
 # from pydub import AudioSegment #TODO uncomment this once I figure out a good solution to the ffmpeg requirement
 from dotenv import load_dotenv
 from email.mime.image import MIMEImage
+
+from librespot import metadata
 from spotipy.exceptions import SpotifyException
 from spotipy.oauth2 import SpotifyOAuth
 from librespot.core import Session
-from librespot.metadata import TrackId
+from librespot.metadata import TrackId, EpisodeId
 from librespot.audio.decoders import VorbisOnlyAudioQuality
 from mutagen.flac import Picture
 from mutagen.oggvorbis import OggVorbis
@@ -99,26 +101,36 @@ class DownloadProcessor:
 		match url_type:
 			case "playlist" | "album":
 				SC = init_spotify_cred()
-				tags_list, collection_name = _get_collection_tags(self.url, url_type)
-				self._download_collection(collection_name, tags_list, download_dir, original_dir)
+				metadata_list, collection_name = _get_collection_metadata(self.url, url_type)
+				self._download_collection(collection_name, metadata_list, download_dir, original_dir)
 
-			case "track":
+			# TODO episode downloading does not work currently
+			# TODO catch/supress this message somehow: Failed reading packet! Failed to receive packet
+			case "track" | "episode":
 				SC = init_spotify_cred()
 				os.chdir(download_dir)
 				try:
-					tags = _get_track_tags(self.url)
-					print(f"Downloading: {tags['artist']} - {tags['title']}")
-					self.download_track(tags)
+					metadata = _get_item_metadata(self.url, url_type)
+					match url_type:
+						case "track":
+							super_title = metadata["album"]
+						case "episode":
+							super_title = metadata["artist"]
+						case _:
+							raise Exception("Unknown URL type") # This should never happen
+
+					print(f"Downloading: {super_title} - {metadata["title"]}")
+					self.download_item(metadata, url_type)
 				finally:
 					os.chdir(original_dir)
 
 			case _:
-				raise Exception("Unknown URL type")
+				raise Exception("Unknown URL type") # This should never happen
 
 		print(f"{SUCC} Download sequence completed.")
 
-	def _download_collection(self, collection_name, tags_list, download_dir, original_dir):
-		total_tracks = len(tags_list)
+	def _download_collection(self, collection_name, metadata_list, download_dir, original_dir):
+		total_tracks = len(metadata_list)
 		width = len(str(total_tracks))
 		safe_collection_name = "".join(
 				[char for char in collection_name if char.isalpha() or char.isdigit() or char in " ',-_"]).strip()
@@ -135,24 +147,24 @@ class DownloadProcessor:
 
 		download_count = 0
 		try:
-			for index, tags in enumerate(tags_list, start=1):
-				final_filename = f"{tags["title"]}{file_ext}"
+			for index, metadata in enumerate(metadata_list, start=1):
+				final_filename = f"{metadata["title"]}{file_ext}"
 
 				# Check if the file is already downloaded
 				if _verify_file_integrity(final_filename):
 					if self.verbosity != AppVerbosity.LOW:
-						print(f"{c.magenta(f"[{index:>{width}}/{total_tracks}]")} Skipping: {tags['artist']} - {tags['title']}")
+						print(f"{c.magenta(f"[{index:>{width}}/{total_tracks}]")} Skipping: {metadata['artist']} - {metadata['title']}")
 					else:
-						self.update_download_progress(index, total_tracks, tags)
+						self.update_download_progress(index, total_tracks, metadata)
 					continue
 
 				if self.verbosity != AppVerbosity.LOW:
-					print(f"{c.cyan(f"[{index:>{width}}/{total_tracks}]")} Downloading: {tags["artist"]} - {tags["title"]}")
+					print(f"{c.cyan(f"[{index:>{width}}/{total_tracks}]")} Downloading: {metadata["artist"]} - {metadata["title"]}")
 				else:
-					self.update_download_progress(index, total_tracks, tags)
+					self.update_download_progress(index, total_tracks, metadata)
 
 				# The file is not downloaded, download it
-				self.download_track(tags)
+				self.download_item(metadata)
 				download_count += 1
 
 				if index < total_tracks:
@@ -171,22 +183,28 @@ class DownloadProcessor:
 		finally:
 			os.chdir(original_dir) # cd back to the program directory
 
-	def download_track(self, tags):
-		track_id = TrackId.from_base62(tags["id"])
+	def download_item(self, metadata, url_type):
+		match url_type:
+			case "track":
+				item_id = TrackId.from_base62(metadata["id"])
+			case "episode":
+				item_id = EpisodeId.from_base62(metadata["id"])
+			case _:
+				raise Exception("Unknown URL type") # This should never happen
 
 		# Fetch the raw decrypted music byte stream from the Content Delivery Network (CDN)
 		session = _get_stream_session(self.verbosity)
 		stream = _safe_api_call(
 			session.content_feeder().load,
-			track_id,
+			item_id,
 			VorbisOnlyAudioQuality(self.settings.audio_quality.librespot_quality),
 			False,
 			None
 		)
 
 		file_ext = self.settings.audio_format.ext.lower().strip()
-		temp_ogg_filename = f"{tags['title']}_temp.ogg" #TODO save as .file so the user does not see it?
-		final_filename = f"{tags['title']}{file_ext}"
+		temp_ogg_filename = f"{metadata['title']}_temp.ogg" #TODO save as .file so the user does not see it?
+		final_filename = f"{metadata['title']}{file_ext}"
 
 		with open(temp_ogg_filename, "wb") as f:
 			f.write(stream.input_stream.stream().read())
@@ -202,7 +220,7 @@ class DownloadProcessor:
 			# 	audio_segment.export(final_filename, format=file_ext.replace(".", ""))
 			# except Exception as e:
 			# 	print(f"{ERROR} Transcoding failed: {e}. Defaulting to original OGG container.")
-			# 	final_filename = f"{tags['title']}.ogg"
+			# 	final_filename = f"{metadata['title']}.ogg"
 			# 	os.rename(temp_ogg_filename, final_filename)
 			# finally:
 			# 	if os.path.exists(temp_ogg_filename):
@@ -210,14 +228,14 @@ class DownloadProcessor:
 
 		if self.verbosity == AppVerbosity.HIGH:
 			print(f"\t{SUCC} Downloaded {final_filename}")
-		self.tag_file(final_filename, tags)
+		self.add_file_metadata(final_filename, metadata)
 
-	def tag_file(self, filename, tags):
-		"""Add tags to the audio file."""
+	def add_file_metadata(self, filename, metadata):
+		"""Add metadata to the audio file."""
 		audio = OggVorbis(filename)
-		audio.update({k: v for k, v in tags.items() if k not in ["id", "image_url"]})
+		audio.update({k: v for k, v in metadata.items() if k not in ["id", "image_url"]})
 
-		image_url = tags["image_url"]
+		image_url = metadata["image_url"]
 		if image_url:
 			try:
 				response = requests.get(image_url, timeout=10)
@@ -242,7 +260,7 @@ class DownloadProcessor:
 
 		audio.save()
 
-	def update_download_progress(self, current, total, tags):
+	def update_download_progress(self, current, total, metadata):
 		"""Update the progress bar print with the current information"""
 		if self.verbosity != AppVerbosity.LOW:
 			return
@@ -261,10 +279,6 @@ class DownloadProcessor:
 
 		filled_segment = c.cyan("█" * filled_length)
 
-		# next_highlight_segment = c.cyan("░") #TODO see which Jacob likes
-		# to_fill_segment = c.gray("░" * (bar_length - filled_length))
-		# colored_bar = filled_segment + next_highlight_segment + to_fill_segment
-
 		if will_fill:
 			next_highlight_segment = c.cyan("░")
 			to_fill_segment = c.gray("░" * (bar_length - filled_length - 1))
@@ -279,7 +293,7 @@ class DownloadProcessor:
 
 
 		# Overwrite the current terminal line dynamically
-		sys.stdout.write(f"\rDownloading {colored_bar} {percentage_text} {count_text} | {tags["title"]} - {tags["artist"]}")
+		sys.stdout.write(f"\rDownloading {colored_bar} {percentage_text} {count_text} | {metadata["title"]} - {metadata["artist"]}")
 		sys.stdout.flush()
 
 		if current == total:
@@ -307,31 +321,59 @@ def _verify_file_integrity(filepath):
 		return False
 
 
-def _build_track_tags(track_data, album_name, release_date, image_url):
-	"""Formats raw track data into a standardized tags dictionary."""
+def _build_item_metadata(track_data, collection_name, release_date, image_url):
+	"""Formats track or episode data into a standardized metadata dictionary."""
+	match track_data.get("type"):
+		case "track":
+			artists = track_data.get("artists", [])
+			artist_string = "/".join([artist["name"] for artist in artists]) if artists else "Unknown Artist"
+		case "episode":
+			show_data = track_data.get("show", {})
+			artist_string = show_data.get("publisher") or show_data.get("name") or "Podcast"
+		case _:
+			raise Exception("Unknown URL type") # This should never happen
+
 	return {
-		"album": album_name,
-		"artist": "/".join([artist["name"] for artist in track_data["artists"]]),
+		"album": collection_name,
+		"artist": artist_string,
 		"title": track_data["name"],
-		"discnumber": str(track_data["disc_number"]),
-		"tracknumber": str(track_data["track_number"]),
-		"year": release_date.split("-")[0],
+		"discnumber": str(track_data.get("disc_number", "")),
+		"tracknumber": str(track_data.get("track_number", "")),
+		"year": release_date.split("-")[0] if release_date and "-" in release_date else "Unknown",
 		"id": track_data["id"],
 		"image_url": image_url
 	}
 
 
-def _get_track_tags(track_url):
-	"""Fetches and processes a single tracks tags."""
-	track_id = _get_url_id(track_url)
-	track_data = _safe_api_call(SC.track, track_id)
-	images = track_data["album"].get("images", [])
+def _get_item_metadata(url, url_type):
+	"""Fetches and processes metadata for a single track or podcast episode."""
+	item_id = _get_url_id(url)
+
+	match url_type:
+		case "track":
+			data = _safe_api_call(SC.track, item_id)
+			album_data = data.get("album", {})
+
+			collection_name = album_data.get("name", "Unknown Album")
+			release_date = album_data.get("release_date", "Unknown Date")
+			images = album_data.get("images", [])
+
+		case "episode":
+			data = _safe_api_call(SC.episode, item_id)
+			show_data = data.get("show", {})
+
+			collection_name = show_data.get("name", "Unknown Podcast")
+			release_date = data.get("release_date", "Unknown Date")
+			images = data.get("images", [])
+		case _:
+			raise Exception("Unknown URL type") # This should never happen
+
 	image_url = images[0]["url"] if images else None
-	return _build_track_tags(track_data, track_data["album"]["name"], track_data["album"]["release_date"], image_url)
+	return _build_item_metadata(data, collection_name, release_date, image_url)
 
 
-def _get_collection_tags(url, url_type):
-	"""Fetches and processes all track tags within a collection."""
+def _get_collection_metadata(url, url_type):
+	"""Fetches and processes all track metadata within a collection."""
 	collection_id = _get_url_id(url)
 
 	match url_type:
@@ -363,7 +405,7 @@ def _get_collection_tags(url, url_type):
 		else:
 			break
 
-	tags_list = []
+	metadata_list = []
 	for item in tracks:
 		match url_type:
 			case "album":
@@ -380,10 +422,10 @@ def _get_collection_tags(url, url_type):
 				images = track_album.get("images", [])
 				image_url = images[0]["url"] if images else None
 
-		track_tags = _build_track_tags(track_data, album_name, release_date, image_url)
-		tags_list.append(track_tags)
+		track_metadata = _build_item_metadata(track_data, album_name, release_date, image_url)
+		metadata_list.append(track_metadata)
 
-	return tags_list, collection_name
+	return metadata_list, collection_name
 
 
 def _safe_api_call(api_func, *args, **kwargs):
