@@ -44,6 +44,18 @@ def init_spotify_cred():
 	))
 
 
+def _verify_ffmpeg_available():
+	"""Checks if the bundled ffmpeg binary is usable"""
+	try:
+		ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
+		if not os.path.exists(ffmpeg_path):
+			raise FileNotFoundError(ffmpeg_path)
+		return ffmpeg_path
+	except Exception as e:
+		print(f"{ERROR} ffmpeg binary unavailable {e}. Only .ogg downloads will work right now.")
+		return None
+
+
 ### Global variables ###
 # Load vars from .env system memory
 load_dotenv()
@@ -51,7 +63,9 @@ load_dotenv()
 SPOTIFY_STREAM_SESSION = None
 SC = None
 # FFmpeg
-ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
+_FFMPEG_PATH = _verify_ffmpeg_available()
+if _FFMPEG_PATH:
+	AudioSegment.converter = _FFMPEG_PATH
 
 
 #TODO add this line in if first time `logging.basicConfig(level=logging.DEBUG)`
@@ -213,22 +227,24 @@ class DownloadProcessor:
 		with open(temp_ogg_filename, "wb") as f:
 			f.write(stream.input_stream.stream().read())
 
-		if file_ext == ".ogg":
+		if file_ext == ".ogg" or not _FFMPEG_PATH:
+			if file_ext != ".ogg":
+				print(f"{WARN} ffmpeg unavailable. Defaulting to .ogg instead of {file_ext}.")
+				final_filename = f"{metadata['title']}.ogg"
 			os.rename(temp_ogg_filename, final_filename)
 		else:
-			pass #TODO uncomment this once I figure out a good solution to the ffmpeg requirement
-			# try:
-			# 	audio_segment = AudioSegment.from_ogg(temp_ogg_filename)
-			#
-			# 	# pydub expects format strings without periods (e.g., "mp3", "flac")
-			# 	audio_segment.export(final_filename, format=file_ext.replace(".", ""))
-			# except Exception as e:
-			# 	print(f"{ERROR} Transcoding failed: {e}. Defaulting to original OGG container.")
-			# 	final_filename = f"{metadata['title']}.ogg"
-			# 	os.rename(temp_ogg_filename, final_filename)
-			# finally:
-			# 	if os.path.exists(temp_ogg_filename):
-			# 		os.remove(temp_ogg_filename)
+			try:
+				audio_segment = AudioSegment.from_ogg(temp_ogg_filename)
+
+				# pydub expects format strings without periods (e.g., "mp3", "flac")
+				audio_segment.export(final_filename, format=file_ext.replace(".", ""))
+			except Exception as e:
+				print(f"{ERROR} Transcoding failed: {e}. Defaulting to original OGG container.")
+				final_filename = f"{metadata['title']}.ogg"
+				os.rename(temp_ogg_filename, final_filename)
+			finally:
+				if os.path.exists(temp_ogg_filename):
+					os.remove(temp_ogg_filename)
 
 		if self.verbosity == AppVerbosity.HIGH:
 			print(f"\t{SUCC} Downloaded {final_filename}")
