@@ -164,7 +164,7 @@ class DownloadProcessor:
 					self.update_download_progress(index, total_tracks, metadata)
 
 				# The file is not downloaded, download it
-				self.download_item(metadata)
+				self.download_item(metadata, "track") #TODO unhard code this when adding entire podcasts
 				download_count += 1
 
 				if index < total_tracks:
@@ -336,6 +336,7 @@ def _build_item_metadata(track_data, collection_name, release_date, image_url):
 	return {
 		"album": collection_name,
 		"artist": artist_string,
+		"albumartist": artist_string, # TODO, check that this works correctly
 		"title": track_data["name"],
 		"discnumber": str(track_data.get("disc_number", "")),
 		"tracknumber": str(track_data.get("track_number", "")),
