@@ -1,7 +1,7 @@
-import math
 import os
 import sys
 import time
+import math
 import json
 import base64
 import random
@@ -9,8 +9,9 @@ import spotipy
 import logging
 import requests
 import threading
+import imageio_ffmpeg
 
-# from pydub import AudioSegment #TODO uncomment this once I figure out a good solution to the ffmpeg requirement
+from pydub import AudioSegment
 from dotenv import load_dotenv
 from email.mime.image import MIMEImage
 
@@ -49,6 +50,9 @@ load_dotenv()
 # Set up Spotify API listening credentials
 SPOTIFY_STREAM_SESSION = None
 SC = None
+# FFmpeg
+ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
+
 
 #TODO add this line in if first time `logging.basicConfig(level=logging.DEBUG)`
 #TODO force the same python packages for all
