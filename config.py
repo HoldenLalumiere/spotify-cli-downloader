@@ -7,7 +7,7 @@ class AppAudioFormat(Enum):
 	# Value format: (extension, UI label, is_implemented)
 	MP3  = (".mp3",  "MP3",        False)
 	M4A  = (".m4a",  "M4A/AAC",    False)
-	FLAC = (".flac", "FLAC",       False)
+	FLAC = (".flac", "FLAC",       True)
 	OGG  = (".ogg",  "Ogg Vorbis", True)
 
 	def __init__(self, ext, label, implemented):

@@ -9,9 +9,10 @@ import spotipy
 import logging
 import requests
 import threading
+import subprocess
 import imageio_ffmpeg
 
-from pydub import AudioSegment
+# from pydub import AudioSegment
 from dotenv import load_dotenv
 from email.mime.image import MIMEImage
 
@@ -21,7 +22,7 @@ from spotipy.oauth2 import SpotifyOAuth
 from librespot.core import Session
 from librespot.metadata import TrackId, EpisodeId
 from librespot.audio.decoders import VorbisOnlyAudioQuality
-from mutagen.flac import Picture
+from mutagen.flac import FLAC, Picture
 from mutagen.oggvorbis import OggVorbis
 from constants import c, SAVED, ERROR, WARN, SUCC, WAIT
 from preference_manager import AppVerbosity
@@ -64,8 +65,6 @@ SPOTIFY_STREAM_SESSION = None
 SC = None
 # FFmpeg
 _FFMPEG_PATH = _verify_ffmpeg_available()
-if _FFMPEG_PATH:
-	AudioSegment.converter = _FFMPEG_PATH
 
 
 #TODO add this line in if first time `logging.basicConfig(level=logging.DEBUG)`
@@ -234,10 +233,11 @@ class DownloadProcessor:
 			os.rename(temp_ogg_filename, final_filename)
 		else:
 			try:
-				audio_segment = AudioSegment.from_ogg(temp_ogg_filename)
-
-				# pydub expects format strings without periods (e.g., "mp3", "flac")
-				audio_segment.export(final_filename, format=file_ext.replace(".", ""))
+				result = subprocess.run(
+					[_FFMPEG_PATH, "-y", "-i", temp_ogg_filename, final_filename], capture_output=True
+				)
+				if result.returncode != 0:
+					raise Exception(f"{WARN} FFmpeg failed with code {result.returncode}")
 			except Exception as e:
 				print(f"{ERROR} Transcoding failed: {e}. Defaulting to original OGG container.")
 				final_filename = f"{metadata['title']}.ogg"
@@ -252,7 +252,16 @@ class DownloadProcessor:
 
 	def add_file_metadata(self, filename, metadata):
 		"""Add metadata to the audio file."""
-		audio = OggVorbis(filename)
+		ext = os.path.splitext(filename)[1].lower()
+		match ext:
+			case ".ogg":
+				audio = OggVorbis(filename)
+			case ".flac":
+				audio = FLAC(filename)
+			case _:
+				print(f"{WARN} {ext} metadata not implemented yet, skipping.")
+				return
+
 		audio.update({k: v for k, v in metadata.items() if k not in ["id", "image_url"]})
 
 		image_url = metadata["image_url"]
@@ -267,11 +276,15 @@ class DownloadProcessor:
 					picture.mime = "image/jpeg"  # Spotify artwork links are always JPEG files
 					picture.description = "Cover"
 
-					# Ogg Vorbis needs metadata as a base64 encoded string
-					picture_bytes = picture.write()
-					encoded_picture = base64.b64encode(picture_bytes).decode("ascii")
+					if ext == ".ogg":
+						# Ogg Vorbis needs metadata as a base64 encoded string
+						picture_bytes = picture.write()
+						encoded_picture = base64.b64encode(picture_bytes).decode("ascii")
+						audio["metadata_block_picture"] = [encoded_picture]
+					elif ext == ".flac":
+						audio.clear_pictures()
+						audio.add_picture(picture)
 
-					audio["metadata_block_picture"] = [encoded_picture]
 				else:
 					print(f"\t{WARN} Artwork server returned status code {response.status_code}")
 

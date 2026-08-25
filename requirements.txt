@@ -3,5 +3,4 @@ python-dotenv
 librespot
 mutagen
 requests
-pydub
 imageio-ffmpeg
