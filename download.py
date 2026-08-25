@@ -31,6 +31,7 @@ from preference_manager import AppVerbosity
 # TODO implement switching between different audio formats
 # TODO when getting the 403 error for someone elses playlist, print a message that the playlist must be made by you
 # TODO add in extra prints if high verbosity
+# TODO add lyric download and metadata addition
 def init_spotify_cred():
 	"""Initializes Spotipy with user authentication credentials."""
 	project_root = os.path.dirname(os.path.abspath(__file__))
