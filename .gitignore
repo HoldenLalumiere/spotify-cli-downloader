@@ -1,6 +1,7 @@
 # Ignore local runtime configuration and credentials
 config.json
 credentials.json
+*.json
 .env
 .cache
 
