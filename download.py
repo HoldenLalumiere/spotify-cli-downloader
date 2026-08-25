@@ -27,7 +27,7 @@ from mutagen.oggvorbis import OggVorbis
 from constants import c, SAVED, ERROR, WARN, SUCC, WAIT
 from preference_manager import AppVerbosity
 
-
+# TODO I don't think that it can handle album names with ! in them
 # TODO implement switching between different audio formats
 # TODO when getting the 403 error for someone elses playlist, print a message that the playlist must be made by you
 # TODO add in extra prints if high verbosity
