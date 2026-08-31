@@ -22,10 +22,11 @@ if sys.platform == "win32":
 # TODO add in user pref, if file exists with different ext, replace, download, or skip (default is to skip)
 @dataclass
 class DownloadSettings:
-	download_dir: str
-	audio_format: str
-	audio_quality: str
+	download_dir:      str
+	audio_format:      str
+	audio_quality:     str
 	check_all_folders: bool
+	generate_m3u:      bool
 
 
 def print_default_invalid_input():
@@ -155,8 +156,9 @@ def handle_pre_download_menu():
 		audio_quality = result
 
 	check_all_folders = user_prefs["check_all_folders"]
+	generate_m3u = user_prefs["generate_m3u"]
 
-	download_settings = DownloadSettings(download_dir, audio_format, audio_quality, check_all_folders) #TODO look into these yellow lines
+	download_settings = DownloadSettings(download_dir, audio_format, audio_quality, check_all_folders, generate_m3u) #TODO look into these yellow lines
 	handle_download_menu(download_settings)
 
 def print_download_menu(settings):
@@ -205,8 +207,9 @@ def print_preferences_menu():
 			\t4. Toggle Main Menu Bypass (Start in Download Menu)
 			\t5. Verbosity
 			\t6. Duplicate Checking
-			\t7. Spotify API Credentials (.env)
-			\t8. {c.red("Spotify session stuff (might happen naturally)")}
+			\t7. Toggle Generate M3U Playlist
+			\t8. Spotify API Credentials (.env)
+			\t9. {c.red("Spotify session stuff (might happen naturally)")}
 			\tr. {c.red("TODO add reset all functionality")}
 			\tb. Back""").strip()
 	print(menu_text)
@@ -229,6 +232,8 @@ def handle_preferences_menu():
 			case "6":
 				handle_duplicate_check_menu()
 			case "7":
+				handle_generate_m3u_menu()
+			case "8":
 				handle_credentials_menu()
 			case "r" | "R":
 				pass #TODO
@@ -455,6 +460,45 @@ def handle_duplicate_check_menu():
 				user_prefs["check_all_folders"] = False
 				save_preferences()
 				print(f"{SAVED} Preference cleared (set to check working folder).\n")
+				break
+			case "b" | "B" | '' | None:
+				break
+			case _:
+				print_default_invalid_input()
+
+def print_generate_m3u_menu():
+	curr_label = "Generates M3U playlists" if user_prefs["generate_m3u"] else "Not generating M3U playlists"
+	menu_text = textwrap.dedent(f"""
+			--- {c.blue("Change Generate M3U Preference", b=True)} ---
+			Current Preference: {c.cyan(curr_label)}
+			If on, an M3U playlist file listing tracks in album/playlist
+			order will be created alongside each download
+			\t1. Generate M3U On
+			\t2. Generate M3U Off
+			\tr. Reset Preference
+			\tb. Back""").strip()
+	print(menu_text)
+
+def handle_generate_m3u_menu():
+	while True:
+		print_generate_m3u_menu()
+		choice = input("> ").strip()
+
+		match choice:
+			case "1":
+				user_prefs["generate_m3u"] = True
+				save_preferences()
+				print(f"{SAVED} Generate M3U updated to On.\n")
+				break
+			case "2":
+				user_prefs["generate_m3u"] = False
+				save_preferences()
+				print(f"{SAVED} Generate M3U updated to Off.\n")
+				break
+			case "r" | "R":
+				user_prefs["generate_m3u"] = False
+				save_preferences()
+				print(f"{SAVED} Preference cleared (set to Off).\n")
 				break
 			case "b" | "B" | '' | None:
 				break

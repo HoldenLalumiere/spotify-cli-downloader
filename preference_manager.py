@@ -16,6 +16,7 @@ default_prefs = {
 	"bypass_main_menu":  False,
 	"verbosity":         AppVerbosity.MEDIUM,
 	"check_all_folders": False,
+	"generate_m3u":      False,
 }
 
 def load_preferences():

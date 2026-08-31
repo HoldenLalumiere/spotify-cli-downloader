@@ -18,6 +18,8 @@ from email.mime.image import MIMEImage
 
 from librespot import metadata
 from spotipy.exceptions import SpotifyException
+from m3u_generator import generate_m3u
+from utils import sanitize_filename
 from spotipy.oauth2 import SpotifyOAuth
 from librespot.core import Session
 from librespot.metadata import TrackId, EpisodeId
@@ -157,8 +159,7 @@ class DownloadProcessor:
 	def _download_collection(self, collection_name, metadata_list, download_dir, original_dir):
 		total_tracks = len(metadata_list)
 		width = len(str(total_tracks))
-		safe_collection_name = "".join(
-				[char for char in collection_name if char.isalpha() or char.isdigit() or char in " ',-_"]).strip()
+		safe_collection_name = sanitize_filename(collection_name)
 
 		# Change directory to that collection in their preferred download directory
 		collection_path = os.path.join(download_dir, safe_collection_name)
@@ -176,7 +177,7 @@ class DownloadProcessor:
 		download_count = 0
 		try:
 			for index, metadata in enumerate(metadata_list, start=1):
-				final_filename = f"{metadata["title"]}{file_ext}"
+				final_filename = f"{sanitize_filename(metadata['title'])}{file_ext}"
 
 				# Check if the file is already downloaded
 				already_downloaded = (
@@ -213,6 +214,11 @@ class DownloadProcessor:
 						if self.verbosity == AppVerbosity.HIGH:
 							print(f"\t{WAIT} {long_break // 60} minutes, downloaded {download_count} tracks...")
 						time.sleep(long_break)
+
+			if self.settings.generate_m3u:
+				generate_m3u(collection_name, metadata_list, collection_path, file_ext)
+				if self.verbosity != AppVerbosity.LOW:
+					print(f"{SUCC} M3U playlist created.")
 		finally:
 			os.chdir(original_dir) # cd back to the program directory
 
@@ -237,7 +243,7 @@ class DownloadProcessor:
 
 		file_ext = self.settings.audio_format.ext.lower().strip()
 		temp_ogg_filename = f"{metadata['title']}_temp.ogg" #TODO save as .file so the user does not see it?
-		final_filename = f"{metadata['title']}{file_ext}"
+		final_filename = f"{sanitize_filename(metadata['title'])}{file_ext}"
 
 		with open(temp_ogg_filename, "wb") as f:
 			f.write(stream.input_stream.stream().read())
