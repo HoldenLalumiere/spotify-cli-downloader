@@ -1,6 +1,6 @@
 import os
 
-from utils import sanitize_filename
+from scripts.utils import sanitize_filename
 
 
 def generate_m3u(collection_name, metadata_list, collection_path, file_ext  ):

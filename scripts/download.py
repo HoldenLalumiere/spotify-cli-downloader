@@ -17,10 +17,10 @@ from dotenv import load_dotenv
 from email.mime.image import MIMEImage
 
 from librespot import metadata
-from config import AppAudioFormat
+from scripts.config import AppAudioFormat
 from spotipy.exceptions import SpotifyException
-from m3u_generator import generate_m3u
-from utils import sanitize_filename
+from scripts.m3u_generator import generate_m3u
+from scripts.utils import sanitize_filename
 from spotipy.oauth2 import SpotifyOAuth
 from librespot.core import Session
 from librespot.metadata import TrackId, EpisodeId
@@ -31,8 +31,8 @@ from mutagen.mp4 import MP4, MP4Cover
 from mutagen.easyid3 import EasyID3
 from mutagen.id3 import ID3NoHeaderError, ID3, APIC
 from mutagen.mp3 import MP3
-from constants import c, SAVED, ERROR, WARN, SUCC, WAIT
-from preference_manager import AppVerbosity
+from scripts.constants import c, SAVED, ERROR, WARN, SUCC, WAIT
+from scripts.preference_manager import AppVerbosity
 
 # TODO when getting the 403 error for someone elses playlist, print a message that the playlist must be made by you
 # TODO add in extra prints if high verbosity

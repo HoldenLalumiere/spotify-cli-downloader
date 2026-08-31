@@ -5,12 +5,12 @@ import textwrap
 from traceback import print_exc
 from urllib.parse import urlparse
 
-from download import download_url
-from config import AUDIO_FORMAT_MAP, AUDIO_QUALITY_MAP, VERBOSITY_MAP
-from preference_manager import save_preferences, user_prefs
-from constants import c, SAVED, ERROR, WARN, SUCC
+from scripts.download import download_url
+from scripts.config import AUDIO_FORMAT_MAP, AUDIO_QUALITY_MAP, VERBOSITY_MAP
+from scripts.preference_manager import save_preferences, user_prefs
+from scripts.constants import c, SAVED, ERROR, WARN, SUCC
 from dataclasses import dataclass
-from credential_manager import save_to_env
+from scripts.credential_manager import save_to_env
 
 
 if sys.platform == "win32":

@@ -1,8 +1,8 @@
 import json
 import os
 
-from config import AppAudioFormat, AppAudioQuality, AppVerbosity
-from constants import ERROR
+from scripts.config import AppAudioFormat, AppAudioQuality, AppVerbosity
+from scripts.constants import ERROR
 
 ### Global Variables ###
 CONFIG_FILE = "../config.json"
