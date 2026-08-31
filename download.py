@@ -17,6 +17,10 @@ from dotenv import load_dotenv
 from email.mime.image import MIMEImage
 
 from librespot import metadata
+from mutagen.easyid3 import EasyID3
+from mutagen.id3 import ID3NoHeaderError, ID3, APIC
+from mutagen.mp3 import MP3
+from config import AppAudioFormat
 from spotipy.exceptions import SpotifyException
 from m3u_generator import generate_m3u
 from utils import sanitize_filename
@@ -59,7 +63,7 @@ def _verify_ffmpeg_available():
 			raise FileNotFoundError(ffmpeg_path)
 		return ffmpeg_path
 	except Exception as e:
-		print(f"{ERROR} ffmpeg binary unavailable {e}. Only .ogg downloads will work right now.")
+		print(f"{ERROR} ffmpeg binary unavailable {e}. Only {AppAudioFormat.OGG.ext} downloads will work right now.")
 		return None
 
 
@@ -80,8 +84,6 @@ _FFMPEG_PATH = _verify_ffmpeg_available()
 #TODO add blue to main menu
 #TODO work on first time user set up
 #TODO add in file name customization in the user prefs
-#TODO add in .m3u generation if in user prefs
-#TODO add in mp3 support
 #TODO randomize the download order for each page (50 items i believe)
 def _get_stream_session(verbosity):
 	"""Returns the current stream session, or builds a fresh one if dropped/idle."""
@@ -243,16 +245,16 @@ class DownloadProcessor:
 		)
 
 		file_ext = self.settings.audio_format.ext.lower().strip()
-		temp_ogg_filename = f"{metadata['title']}_temp.ogg" #TODO save as .file so the user does not see it?
+		temp_ogg_filename = f"{metadata['title']}_temp{AppAudioFormat.OGG.ext}" #TODO save as .file so the user does not see it?
 		final_filename = f"{sanitize_filename(metadata['title'])}{file_ext}"
 
 		with open(temp_ogg_filename, "wb") as f:
 			f.write(stream.input_stream.stream().read())
 
-		if file_ext == ".ogg" or not _FFMPEG_PATH:
-			if file_ext != ".ogg":
-				print(f"{WARN} ffmpeg unavailable. Defaulting to .ogg instead of {file_ext}.")
-				final_filename = f"{sanitize_filename(metadata['title'])}.ogg"
+		if file_ext == AppAudioFormat.OGG.ext or not _FFMPEG_PATH:
+			if file_ext != AppAudioFormat.OGG.ext:
+				print(f"{WARN} ffmpeg unavailable. Defaulting to {AppAudioFormat.OGG.ext} instead of {file_ext}.")
+				final_filename = f"{sanitize_filename(metadata['title'])}{AppAudioFormat.OGG.ext}"
 			os.rename(temp_ogg_filename, final_filename)
 		else:
 			try:
@@ -263,7 +265,7 @@ class DownloadProcessor:
 					raise Exception(f"{WARN} FFmpeg failed with code {result.returncode}")
 			except Exception as e:
 				print(f"{ERROR} Transcoding failed: {e}. Defaulting to original OGG container.")
-				final_filename = f"{sanitize_filename(metadata['title'])}.ogg"
+				final_filename = f"{sanitize_filename(metadata['title'])}{AppAudioFormat.OGG.ext}"
 				os.rename(temp_ogg_filename, final_filename)
 			finally:
 				if os.path.exists(temp_ogg_filename):
@@ -277,36 +279,75 @@ class DownloadProcessor:
 		"""Add metadata to the audio file."""
 		ext = os.path.splitext(filename)[1].lower()
 		match ext:
-			case ".ogg":
+			case AppAudioFormat.OGG.ext:
 				audio = OggVorbis(filename)
-			case ".flac":
+			case AppAudioFormat.FLAC.ext:
 				audio = FLAC(filename)
+			case AppAudioFormat.MP3.ext:
+				try:
+					audio = EasyID3(filename)
+				except ID3NoHeaderError:
+					# Freshly transcoded MP3s have no ID3 tag yet: create one
+					audio = EasyID3()
+					audio.save(filename)
+					audio = EasyID3(filename)
 			case _:
 				print(f"{WARN} {ext} metadata not implemented yet, skipping.")
 				return
 
-		audio.update({k: v for k, v in metadata.items() if k not in ["id", "image_url"]})
+		if ext == AppAudioFormat.MP3.ext:
+			# Map FLAC metadata tag names to mp3 metadata tag names
+			id3_tag_map = {
+				"album": "album",
+				"artist": "artist",
+				"albumartist": "albumartist",
+				"title": "title",
+				"discnumber": "discnumber",
+				"tracknumber": "tracknumber",
+				"year": "date",
+			}
+			for meta_key, id3_key in id3_tag_map.items():
+				if metadata.get(meta_key):
+					audio[id3_key] = str(metadata[meta_key])
+		else:
+			audio.update({k: v for k, v in metadata.items() if k not in ["id", "image_url"]})
+
+		audio.save()
 
 		image_url = metadata["image_url"]
 		if image_url:
 			try:
 				response = requests.get(image_url, timeout=10)
 				if response.status_code == 200:
-					# Build a Vorbis-compliant picture block metadata frame
-					picture = Picture()
-					picture.data = response.content
-					picture.type = 3  # Type 3 is the industry standard for 'Front Cover'
-					picture.mime = "image/jpeg"  # Spotify artwork links are always JPEG files
-					picture.description = "Cover"
+					if ext == AppAudioFormat.MP3.ext:
+						id3 = ID3(filename)
+						id3.delall("APIC")
+						id3.add(APIC(
+							encoding=3,
+							mime="image/jpeg",
+							type=3,
+							desc="Cover",
+							data=response.content
+						))
+						id3.save()
+					else:
+						# Build a Vorbis-compliant picture block metadata frame
+						picture = Picture()
+						picture.data = response.content
+						picture.type = 3  # Type 3 is the industry standard for 'Front Cover'
+						picture.mime = "image/jpeg"  # Spotify artwork links are always JPEG files
+						picture.description = "Cover"
 
-					if ext == ".ogg":
-						# Ogg Vorbis needs metadata as a base64 encoded string
-						picture_bytes = picture.write()
-						encoded_picture = base64.b64encode(picture_bytes).decode("ascii")
-						audio["metadata_block_picture"] = [encoded_picture]
-					elif ext == ".flac":
-						audio.clear_pictures()
-						audio.add_picture(picture)
+						if ext == AppAudioFormat.OGG.ext:
+							# Ogg Vorbis needs metadata as a base64 encoded string
+							picture_bytes = picture.write()
+							encoded_picture = base64.b64encode(picture_bytes).decode("ascii")
+							audio["metadata_block_picture"] = [encoded_picture]
+							audio.save()
+						elif ext == AppAudioFormat.FLAC.ext:
+							audio.clear_pictures()
+							audio.add_picture(picture)
+							audio.save()
 
 				else:
 					print(f"\t{WARN} Artwork server returned status code {response.status_code}")
@@ -314,7 +355,7 @@ class DownloadProcessor:
 			except Exception as e:
 				print(f"\t{WARN} Failed to embed album art due to network or format error: {e}")
 
-		audio.save()
+
 
 	def update_download_progress(self, current, total, metadata):
 		"""Update the progress bar print with the current information"""
@@ -368,10 +409,12 @@ def _verify_audio_validity(filepath):
 	ext = os.path.splitext(filepath)[1].lower()
 	try:
 		match ext:
-			case ".ogg":
+			case AppAudioFormat.OGG.ext:
 				OggVorbis(filepath)
-			case ".flac":
+			case AppAudioFormat.FLAC.ext:
 				FLAC(filepath)
+			case AppAudioFormat.MP3.ext:
+				MP3(filepath)
 			case _:
 				return False
 		return True

@@ -5,7 +5,7 @@ from librespot.audio.decoders import AudioQuality as LibrespotAudioQuality
 ### Audio Formats ###
 class AppAudioFormat(Enum):
 	# Value format: (extension, UI label, is_implemented)
-	MP3  = (".mp3",  "MP3",        False)
+	MP3  = (".mp3",  "MP3",        True)
 	M4A  = (".m4a",  "M4A/AAC",    False)
 	FLAC = (".flac", "FLAC",       True)
 	OGG  = (".ogg",  "Ogg Vorbis", True)
