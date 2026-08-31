@@ -1,6 +1,6 @@
 import os
 import json
-from download import init_spotify_cred, _get_url_id, _safe_api_call
+from scripts.download import init_spotify_cred, _get_url_id, _safe_api_call
 
 
 def save_spotify_json_fixture(url, output_dir="tests/"):

@@ -1,7 +1,7 @@
 import unittest
 import itertools
 
-from main import is_valid_spotify_url
+from scripts.main import is_valid_spotify_url
 
 class TestSpotifyUrlValidation(unittest.TestCase):
 	def test_valid_spotify_links(self):

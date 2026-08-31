@@ -2,11 +2,9 @@ import threading
 import time
 import unittest
 from unittest.mock import patch, MagicMock, mock_open
-import os
 
-from download import DownloadProcessor
-from preference_manager import AppVerbosity
-from config import AppAudioFormat, AppAudioQuality
+from scripts.download import DownloadProcessor
+from scripts.preference_manager import AppVerbosity
 
 _real_sleep = time.sleep
 

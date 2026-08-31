@@ -41,7 +41,7 @@ from preference_manager import AppVerbosity
 def init_spotify_cred():
 	"""Initializes Spotipy with user authentication credentials."""
 	project_root = os.path.dirname(os.path.abspath(__file__))
-	cache_path = os.path.join(project_root, ".cache")
+	cache_path = os.path.join(project_root, "../.cache")
 
 	return spotipy.Spotify(auth_manager=SpotifyOAuth(
 			client_id=os.getenv("SPOTIPY_CLIENT_ID"),

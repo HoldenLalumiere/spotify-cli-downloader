@@ -5,7 +5,7 @@ from config import AppAudioFormat, AppAudioQuality, AppVerbosity
 from constants import ERROR
 
 ### Global Variables ###
-CONFIG_FILE = "config.json"
+CONFIG_FILE = "../config.json"
 user_prefs = {}
 
 # Default preferences

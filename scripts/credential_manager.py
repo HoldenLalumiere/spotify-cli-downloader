@@ -6,7 +6,7 @@ def save_to_env(key, value):
 	Reads or creates a .env file, drops any old entry matching the key,
 	and appends the updated key-value pair to the end of the file.
 	"""
-	env_file = ".env"
+	env_file = "../.env"
 
 	# Read existing lines if the file exists, otherwise start clean
 	lines = []
