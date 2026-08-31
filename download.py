@@ -36,6 +36,7 @@ from preference_manager import AppVerbosity
 # TODO add in extra prints if high verbosity
 # TODO add lyric download and metadata addition
 # TODO look into extra M3U complexities to see if they should be added
+# TODO make sanitizing names OS dependent
 def init_spotify_cred():
 	"""Initializes Spotipy with user authentication credentials."""
 	project_root = os.path.dirname(os.path.abspath(__file__))
@@ -81,7 +82,6 @@ _FFMPEG_PATH = _verify_ffmpeg_available()
 #TODO add in file name customization in the user prefs
 #TODO add in .m3u generation if in user prefs
 #TODO add in mp3 support
-#TODO skirt right under the spotify request limit instead of adding random time
 #TODO randomize the download order for each page (50 items i believe)
 def _get_stream_session(verbosity):
 	"""Returns the current stream session, or builds a fresh one if dropped/idle."""
@@ -204,7 +204,7 @@ class DownloadProcessor:
 
 				if index < total_tracks:
 					# Short delay between each track
-					sleep_time = random.uniform(3.0, 7.0)
+					sleep_time = random.uniform(1.5, 3.5)
 					if self.verbosity == AppVerbosity.HIGH:
 						print(f"\t{WAIT} {sleep_time:.2f} seconds to protect rate limits...")
 					time.sleep(sleep_time)
