@@ -34,8 +34,6 @@ from mutagen.mp3 import MP3
 from constants import c, SAVED, ERROR, WARN, SUCC, WAIT
 from preference_manager import AppVerbosity
 
-# TODO fix print order, print downloading after establishing connection
-# TODO I don't think that it can handle album names with ! in them
 # TODO implement switching between different audio formats
 # TODO when getting the 403 error for someone elses playlist, print a message that the playlist must be made by you
 # TODO add in extra prints if high verbosity
@@ -150,6 +148,7 @@ class DownloadProcessor:
 						case _:
 							raise Exception("Unknown URL type") # This should never happen
 
+					_get_stream_session(self.verbosity)
 					print(f"Downloading: {super_title} - {metadata["title"]}")
 					self.download_item(metadata, url_type)
 				finally:
@@ -177,6 +176,8 @@ class DownloadProcessor:
 
 		search_root = download_dir if self.settings.check_all_folders else collection_path
 		existing_file_index = _build_file_index(search_root)
+
+		_get_stream_session(self.verbosity)
 
 		download_count = 0
 		try:
