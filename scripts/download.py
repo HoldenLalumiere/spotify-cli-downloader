@@ -38,6 +38,8 @@ from scripts.preference_manager import AppVerbosity
 # TODO add in extra prints if high verbosity
 # TODO add lyric download and metadata addition
 # TODO look into extra M3U complexities to see if they should be added
+# TODO change album artist to be just the main artist
+# TODO manually generate an M3U for masayoshi and DKC
 def init_spotify_cred():
 	"""Initializes Spotipy with user authentication credentials."""
 	project_root = os.path.dirname(os.path.abspath(__file__))
@@ -207,12 +209,14 @@ class DownloadProcessor:
 					self.update_download_progress(index, total_tracks, metadata)
 
 				# The file is not downloaded, download it
-				self.download_item(metadata, "track") #TODO unhard code this when adding entire podcasts
+				success = self.download_item(metadata, "track") #TODO unhard code this when adding entire podcasts
+				if not success:
+					continue
 				download_count += 1
 
 				if download_count < total_tracks:
 					# Short delay between each track
-					sleep_time = random.uniform(1.5, 3.5)
+					sleep_time = random.uniform(2.5, 5.0)
 					if self.verbosity == AppVerbosity.HIGH:
 						print(f"\t{WAIT} {sleep_time:.2f} seconds to protect rate limits...")
 					time.sleep(sleep_time)
@@ -242,13 +246,28 @@ class DownloadProcessor:
 
 		# Fetch the raw decrypted music byte stream from the Content Delivery Network (CDN)
 		session = _get_stream_session(self.verbosity)
-		stream = _safe_api_call(
-			session.content_feeder().load,
-			item_id,
-			VorbisOnlyAudioQuality(self.settings.audio_quality.librespot_quality),
-			False,
-			None
-		)
+
+		stream = None
+		audio_key_retries = 3
+		audio_key_delay = 2
+		for attempt in range(audio_key_retries):
+			try:
+				stream = _safe_api_call(
+					session.content_feeder().load,
+					item_id,
+					VorbisOnlyAudioQuality(self.settings.audio_quality.librespot_quality),
+					False,
+					None
+				)
+				break
+			except RuntimeError as e:
+				if attempt < audio_key_retries - 1:
+					print(f"\t{WARN} Audio key fetch failed for '{metadata['title']}' (attempt [{attempt + 1}/{audio_key_retries}]). Retrying in {audio_key_delay}s...")
+					time.sleep(audio_key_delay)
+					audio_key_delay *= 2
+				else:
+					print(f"\t{ERROR} Skipping '{metadata['title']}': unable to fetch audio key after {audio_key_retries} attempts ({e}).")
+					return False
 
 		file_ext = self.settings.audio_format.ext.lower().strip()
 		temp_ogg_filename = f"{metadata['title']}_temp{AppAudioFormat.OGG.ext}" #TODO save as .file so the user does not see it?
@@ -280,6 +299,7 @@ class DownloadProcessor:
 		if self.verbosity == AppVerbosity.HIGH:
 			print(f"\t{SUCC} Downloaded {final_filename}")
 		self.add_file_metadata(final_filename, metadata)
+		return True
 
 	def add_file_metadata(self, filename, metadata):
 		"""Add metadata to the audio file."""
