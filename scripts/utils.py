@@ -30,6 +30,34 @@ def sanitize_filename(name):
 		cleaned.rstrip(".")
 	return cleaned
 
+
+def validate_filename_pattern(pattern):
+	"""Validates the user entered filename pattern."""
+	if not pattern:
+		return False, "Pattern cannot be empty" # This will not happen because of the Back functionality
+
+	if re.search(r'(?<!\\)\\(?!\\|\|)', pattern):
+		return False, "Invalid escape sequence. Only '\\|' and '\\\\' are supported."
+
+	# Remove all valid uses of \\ and \| so we can check for single |'s
+	clean_pattern = pattern.replace(r'\\', '').replace(r'\|', '')
+	if clean_pattern.count('|') % 2 != 0:
+		return False, "Unbalanced '|' delimiter detected. Ensure all metadata keywords start and end with '|'."
+
+	# Check all keywords
+	chunks = clean_pattern.split('|')
+	for i in range(1, len(chunks), 2):
+		keyword = chunks[i]
+
+		if not keyword:
+			return False, "Empty keyword tags (e.g., '||') are not allowed."
+
+		if keyword.lower() not in VALID_FILENAME_KEYWORDS:
+			return False, f"Invalid keyword: '|{keyword}|'. Type 'h' for a list of valid keywords."
+
+	return True, ""
+
+
 def format_custom_filename(pattern, metadata):
 	"""
 	Parses patterns bounded by `|` and replaces valid keywords with metadata values.

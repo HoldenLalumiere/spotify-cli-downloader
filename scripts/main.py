@@ -11,7 +11,7 @@ from scripts.preference_manager import save_preferences, user_prefs, default_pre
 from scripts.constants import c, SAVED, ERROR, WARN, SUCC
 from dataclasses import dataclass
 from scripts.credential_manager import save_to_env
-from scripts.utils import format_custom_filename, VALID_FILENAME_KEYWORDS
+from scripts.utils import VALID_FILENAME_KEYWORDS, validate_filename_pattern
 
 
 if sys.platform == "win32":
@@ -159,8 +159,9 @@ def handle_pre_download_menu():
 
 	check_all_folders = user_prefs["check_all_folders"]
 	generate_m3u = user_prefs["generate_m3u"]
+	filename_format = user_prefs["filename_format"]
 
-	download_settings = DownloadSettings(download_dir, audio_format, audio_quality, check_all_folders, generate_m3u) #TODO look into these yellow lines
+	download_settings = DownloadSettings(download_dir, audio_format, audio_quality, check_all_folders, generate_m3u, filename_format) #TODO look into these yellow lines
 	handle_download_menu(download_settings)
 
 def print_download_menu(settings):
@@ -553,7 +554,12 @@ def handle_filename_menu():
 			case "b" | "B" | '' | None:
 				break
 
-			case _: # TODO actually verify that the input was valid at this step, not later
+			case _:
+				is_valid, error_msg = validate_filename_pattern(choice)
+				if not is_valid:
+					print(f"{ERROR} {error_msg}\n")
+					continue
+
 				user_prefs["filename_format"] = choice
 				save_preferences()
 				print(f"{SAVED} Filename Format updated to {choice}.\n")
