@@ -7,10 +7,11 @@ from urllib.parse import urlparse
 
 from scripts.download import download_url
 from scripts.config import AUDIO_FORMAT_MAP, AUDIO_QUALITY_MAP, VERBOSITY_MAP
-from scripts.preference_manager import save_preferences, user_prefs
+from scripts.preference_manager import save_preferences, user_prefs, default_prefs
 from scripts.constants import c, SAVED, ERROR, WARN, SUCC
 from dataclasses import dataclass
 from scripts.credential_manager import save_to_env
+from scripts.utils import format_custom_filename, VALID_FILENAME_KEYWORDS
 
 
 if sys.platform == "win32":
@@ -27,6 +28,7 @@ class DownloadSettings:
 	audio_quality:     str
 	check_all_folders: bool
 	generate_m3u:      bool
+	filename_format:   str
 
 
 def print_default_invalid_input():
@@ -208,8 +210,9 @@ def print_preferences_menu():
 			\t5. Verbosity
 			\t6. Duplicate Checking
 			\t7. Toggle Generate M3U Playlist
-			\t8. Spotify API Credentials (.env)
-			\t9. {c.red("Spotify session stuff (might happen naturally)")}
+			\t8. Change Filename Format
+			\t9. Spotify API Credentials (.env)
+			\t0. {c.red("Spotify session stuff (might happen naturally)")}
 			\tr. {c.red("TODO add reset all functionality")}
 			\tb. Back""").strip()
 	print(menu_text)
@@ -234,6 +237,8 @@ def handle_preferences_menu():
 			case "7":
 				handle_generate_m3u_menu()
 			case "8":
+				handle_filename_menu()
+			case "9":
 				handle_credentials_menu()
 			case "r" | "R":
 				pass #TODO
@@ -262,15 +267,15 @@ def handle_download_dir_menu():
 	result = prompt_download_dir(user_prefs["download_dir"], is_preference=True)
 
 	match result:
-		case "back":
-			pass
-
-		case "reset":
-			user_prefs["download_dir"] = None
+		case "r" | "R":
+			user_prefs["download_dir"] = default_prefs["download_dir"]
 			save_preferences()
 			print(f"{SAVED} Preference cleared.\n")
 
-		case _:  # Returned a valid string path
+		case "b" | "B" | '' | None:
+			pass
+
+		case _:  # TODO check that they Returned a valid string path based on their OS
 			user_prefs["download_dir"] = result
 			save_preferences()
 			print(f"{SAVED} Download location updated to {result}.\n")
@@ -294,13 +299,13 @@ def handle_audio_format_menu():
 	result = prompt_audio_format(user_prefs["audio_format"], is_preference=True)
 
 	match result:
-		case "back":
-			pass
-
-		case "reset":
-			user_prefs["audio_format"] = None
+		case "r" | "R":
+			user_prefs["audio_format"] = default_prefs["audio_format"]
 			save_preferences()
 			print(f"{SAVED} Preference cleared.\n")
+
+		case "b" | "B" | '' | None:
+			pass
 
 		case _:  # Returned a valid format enum
 			user_prefs["audio_format"] = result
@@ -326,13 +331,13 @@ def handle_audio_quality_menu():
 	result = prompt_audio_quality(user_prefs["audio_quality"], is_preference=True)
 
 	match result:
-		case "back":
-			pass
-
-		case "reset":
-			user_prefs["audio_quality"] = None
+		case "r" | "R":
+			user_prefs["audio_quality"] = default_prefs["audio_quality"]
 			save_preferences()
 			print(f"{SAVED} Preference cleared.\n")
+
+		case "b" | "B" | '' | None:
+			pass
 
 		case _:  # Returned a valid quality enum
 			user_prefs["audio_quality"] = result
@@ -363,18 +368,22 @@ def handle_bypass_menu():
 				save_preferences()
 				print(f"{SAVED} Bypass updated to On.\n")
 				break
+
 			case "2":
 				user_prefs["bypass_main_menu"] = False
 				save_preferences()
 				print(f"{SAVED} Bypass updated to Off.\n")
 				break
+
 			case "r" | "R":
-				user_prefs["bypass_main_menu"] = False
+				user_prefs["bypass_main_menu"] = default_prefs["bypass_main_menu"]
 				save_preferences()
-				print(f"{SAVED} Preference cleared (Bypass set to Off).\n")
+				print(f"{SAVED} Preference cleared (Bypass set to Off).\n") #TODO make this print dynamic based on default_prefs
 				break
+
 			case "b" | "B" | '' | None:
 				break
+
 			case _:
 				print_default_invalid_input()
 
@@ -415,9 +424,9 @@ def handle_verbosity_menu():
 				break
 
 			case "r" | "R":
-				user_prefs["verbosity"] = VERBOSITY_MAP["2"] # Default to Medium
+				user_prefs["verbosity"] = default_prefs["verbosity"]
 				save_preferences()
-				print(f"{SAVED} Preference reset to default (Medium).\n")
+				print(f"{SAVED} Preference reset to default (Medium).\n") #TODO make this print dynamic based on default_prefs
 				break
 
 			case "b" | "B" | '' | None:
@@ -451,16 +460,19 @@ def handle_duplicate_check_menu():
 				save_preferences()
 				print(f"{SAVED} Updated to check all folders.\n")
 				break
+
 			case "2":
 				user_prefs["check_all_folders"] = False
 				save_preferences()
 				print(f"{SAVED} Updated to check working folder.\n")
 				break
+
 			case "r" | "R":
-				user_prefs["check_all_folders"] = False
+				user_prefs["check_all_folders"] = default_prefs["check_all_folders"]
 				save_preferences()
 				print(f"{SAVED} Preference cleared (set to check working folder).\n")
 				break
+
 			case "b" | "B" | '' | None:
 				break
 			case _:
@@ -490,20 +502,84 @@ def handle_generate_m3u_menu():
 				save_preferences()
 				print(f"{SAVED} Generate M3U updated to On.\n")
 				break
+
 			case "2":
 				user_prefs["generate_m3u"] = False
 				save_preferences()
 				print(f"{SAVED} Generate M3U updated to Off.\n")
 				break
+
 			case "r" | "R":
-				user_prefs["generate_m3u"] = False
+				user_prefs["generate_m3u"] = default_prefs["generate_m3u"]
 				save_preferences()
 				print(f"{SAVED} Preference cleared (set to Off).\n")
 				break
+
 			case "b" | "B" | '' | None:
 				break
+
 			case _:
 				print_default_invalid_input()
+
+def print_filename_menu():
+	curr_pattern = user_prefs["filename_format"]
+	menu_text = textwrap.dedent(f"""
+			--- {c.blue("Change Filename Format Preference", b=True)} ---
+			Current Setting: {c.cyan(curr_pattern)}
+			Wrap metadata tags in bars, e.g., |artist| - |title|
+			Use \\| to write a literal bar '|' or \\\\ for a literal '\\\\'
+			\th. Help
+			\tr. Reset Preference
+			\tb. Back""").strip()
+
+	print(menu_text)
+
+def handle_filename_menu():
+	while True:
+		print_filename_menu()
+		choice = input("> ").strip()
+
+		match choice.lower():
+			case "h" | "H":
+				print_filename_help()
+				continue
+
+			case "r" | "R":
+				user_prefs["filename_format"] = default_prefs["filename_format"]
+				save_preferences()
+				print(f"{SAVED} Preference reset to default (|title|).\n")  #TODO make this print dynamic based on default_prefs
+				break
+
+			case "b" | "B" | '' | None:
+				break
+
+			case _: # TODO actually verify that the input was valid at this step, not later
+				user_prefs["filename_format"] = choice
+				save_preferences()
+				print(f"{SAVED} Filename Format updated to {choice}.\n")
+				break
+
+def print_filename_help():
+	menu_lines = [
+		"Use pattern syntax to define how downloaded files are named.",
+		f"Wrap metadata tag names in bar symbols: {c.cyan('|keyword|')}\n",
+		f"{c.blue('Valid Keywords:', b=True)}"
+	]
+
+	for keyword in VALID_FILENAME_KEYWORDS:
+		menu_lines.append(f"  • {c.cyan('|' + keyword + '|'):<18}")
+
+	menu_lines.extend([
+		f"\n{c.blue('Escape Characters:', b=True)}",
+		f"  Use backslash {c.cyan('\\')} to escape standard special tokens:",
+		"    \\| -> literal '|'",
+		"    \\\\ -> literal '\\'\n",
+		f"{c.blue('Example:', b=True)}",
+		"  Pattern: {|artist|} --- |year| = |title|",
+		"  Result:  {Theo Katzman} --- 2017 = Hard Work"
+	])
+
+	print(textwrap.dedent("\n".join(menu_lines)).strip())
 
 def print_id_credentials_menu():
 	menu_lines = textwrap.dedent(f"""
@@ -575,14 +651,17 @@ def handle_id_credentials_menu():
 		choice = input("> ").strip()
 
 		match choice:
-			case "b" | "B" | '' | None:
-				return "back"
 			case "h" | "H":
 				print_id_credentials_help()
+
+			case "b" | "B" | '' | None:
+				return "back"
+
 			case _ if is_valid_spotify_hex(choice):
 				save_to_env("SPOTIPY_CLIENT_ID", choice)
 				print(f"{SAVED} Client ID")
 				break
+
 			case _:
 				print(f"{ERROR} Invalid Client ID format. It must be a 32-character hex string.")
 
@@ -592,14 +671,17 @@ def handle_secret_credentials_menu():
 		choice = input("> ").strip() #TODO replace with password safe input box
 
 		match choice:
-			case "b" | "B" | '' | None:
-				return "back"
 			case "h" | "H":
 				print_secret_credentials_help()
+
+			case "b" | "B" | '' | None:
+				return "back"
+
 			case _ if is_valid_spotify_hex(choice):
 				save_to_env("SPOTIPY_CLIENT_SECRET", choice)
 				print(f"{SAVED} Client Secret")
 				break
+
 			case _:
 				print(f"{ERROR} Invalid Client Secret format. It must be a 32-character hex string.")
 
@@ -611,10 +693,12 @@ def handle_redirect_credentials_menu():
 		match choice:
 			case "b" | "B" | '' | None:
 				return "back"
+
 			case _ if is_valid_url(choice):
 				save_to_env("SPOTIPY_REDIRECT_URI", choice)
 				print(f"{SAVED} Redirect URI")
 				break
+
 			case _:
 				print(f"{ERROR} Invalid Redirect URI. Please enter a valid URL (e.g., http://localhost:8080).")
 

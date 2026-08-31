@@ -17,6 +17,7 @@ default_prefs = {
 	"verbosity":         AppVerbosity.MEDIUM,
 	"check_all_folders": False,
 	"generate_m3u":      False,
+	"filename_format":   "|title|",
 }
 
 def load_preferences():
@@ -89,7 +90,6 @@ def save_preferences():
 		serializable_prefs["verbosity"] = serializable_prefs["verbosity"].name
 	# Note: If it is None, it safely stays None (which JSON turns into null)
 
-	# 3. Write the clean copy to the physical file
 	with open(CONFIG_FILE, "w") as f:
 		json.dump(serializable_prefs, f, indent=4) # indent 4 makes it readable
 
