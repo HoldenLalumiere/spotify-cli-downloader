@@ -179,9 +179,14 @@ class DownloadProcessor:
 
 		_get_stream_session(self.verbosity)
 
+		# Download the items in a randomized order to avoid a predictable sequential request pattern.
+		# Need to keep metadata_list in order though for M3U generation and the progress bar
+		download_order = list(enumerate(metadata_list, start=1))
+		random.shuffle(download_order)
+
 		download_count = 0
 		try:
-			for index, metadata in enumerate(metadata_list, start=1):
+			for index, metadata in download_order:
 				final_filename = f"{sanitize_filename(metadata['title'])}{file_ext}"
 
 				# Check if the file is already downloaded
@@ -206,7 +211,7 @@ class DownloadProcessor:
 				self.download_item(metadata, "track") #TODO unhard code this when adding entire podcasts
 				download_count += 1
 
-				if index < total_tracks:
+				if download_count < total_tracks:
 					# Short delay between each track
 					sleep_time = random.uniform(1.5, 3.5)
 					if self.verbosity == AppVerbosity.HIGH:
@@ -214,7 +219,7 @@ class DownloadProcessor:
 					time.sleep(sleep_time)
 
 					# Take a long break every 20 downloads
-					if download_count % 20 == 0 and download_count != total_tracks:
+					if download_count % 20 == 0:
 						long_break = random.randint(120, 300)  # 2 to 5 minutes
 						if self.verbosity == AppVerbosity.HIGH:
 							print(f"\t{WAIT} {long_break // 60} minutes, downloaded {download_count} tracks...")
