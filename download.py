@@ -17,9 +17,6 @@ from dotenv import load_dotenv
 from email.mime.image import MIMEImage
 
 from librespot import metadata
-from mutagen.easyid3 import EasyID3
-from mutagen.id3 import ID3NoHeaderError, ID3, APIC
-from mutagen.mp3 import MP3
 from config import AppAudioFormat
 from spotipy.exceptions import SpotifyException
 from m3u_generator import generate_m3u
@@ -30,6 +27,10 @@ from librespot.metadata import TrackId, EpisodeId
 from librespot.audio.decoders import VorbisOnlyAudioQuality
 from mutagen.flac import FLAC, Picture
 from mutagen.oggvorbis import OggVorbis
+from mutagen.mp4 import MP4, MP4Cover
+from mutagen.easyid3 import EasyID3
+from mutagen.id3 import ID3NoHeaderError, ID3, APIC
+from mutagen.mp3 import MP3
 from constants import c, SAVED, ERROR, WARN, SUCC, WAIT
 from preference_manager import AppVerbosity
 
@@ -291,12 +292,14 @@ class DownloadProcessor:
 					audio = EasyID3()
 					audio.save(filename)
 					audio = EasyID3(filename)
+			case AppAudioFormat.M4A.ext:
+				audio = MP4(filename)
 			case _:
 				print(f"{WARN} {ext} metadata not implemented yet, skipping.")
 				return
 
 		if ext == AppAudioFormat.MP3.ext:
-			# Map FLAC metadata tag names to mp3 metadata tag names
+			# Map metadata tag names to mp3 ID3 tag names
 			id3_tag_map = {
 				"album": "album",
 				"artist": "artist",
@@ -309,6 +312,31 @@ class DownloadProcessor:
 			for meta_key, id3_key in id3_tag_map.items():
 				if metadata.get(meta_key):
 					audio[id3_key] = str(metadata[meta_key])
+		elif ext == AppAudioFormat.M4A.ext:
+			# Map metadata tag names to MP4 atom keys
+			mp4_tag_map = {
+				"©alb": "album",
+				"©ART": "artist",
+				"aART": "albumartist",
+				"©nam": "title",
+				"©day": "year",
+			}
+			for atom_key, meta_key in mp4_tag_map.items():
+				if metadata.get(meta_key):
+					audio[atom_key] = [str(metadata[meta_key])]
+
+			# Track/disc numbers are (number, total) tuples in MP4: total is unknown right now, so use 0
+			# TODO possibly store the total number of tracks/disks so this can be saved properly
+			if metadata.get("tracknumber"):
+				try:
+					audio["trkn"] = [(int(metadata["tracknumber"]), 0)]
+				except ValueError:
+					pass
+			if metadata.get("discnumber"):
+				try:
+					audio["disk"] = [(int(metadata["discnumber"]), 0)]
+				except ValueError:
+					pass
 		else:
 			audio.update({k: v for k, v in metadata.items() if k not in ["id", "image_url"]})
 
@@ -330,6 +358,9 @@ class DownloadProcessor:
 							data=response.content
 						))
 						id3.save()
+					elif ext == AppAudioFormat.M4A.ext:
+						audio["covr"] = [MP4Cover(response.content, imageformat=MP4Cover.FORMAT_JPEG)]
+						audio.save()
 					else:
 						# Build a Vorbis-compliant picture block metadata frame
 						picture = Picture()
@@ -354,7 +385,6 @@ class DownloadProcessor:
 
 			except Exception as e:
 				print(f"\t{WARN} Failed to embed album art due to network or format error: {e}")
-
 
 
 	def update_download_progress(self, current, total, metadata):
@@ -415,6 +445,8 @@ def _verify_audio_validity(filepath):
 				FLAC(filepath)
 			case AppAudioFormat.MP3.ext:
 				MP3(filepath)
+			case AppAudioFormat.M4A.ext:
+				MP4(filepath)
 			case _:
 				return False
 		return True
