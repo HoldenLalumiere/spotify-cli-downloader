@@ -78,7 +78,6 @@ _FFMPEG_PATH = _verify_ffmpeg_available()
 
 #TODO add this line in if first time `logging.basicConfig(level=logging.DEBUG)`
 #TODO force the same python packages for all
-#TODO rename tags to metadata
 #TODO add a print out after establishing connection
 #TODO add blue to main menu
 #TODO work on first time user set up
@@ -315,7 +314,7 @@ class DownloadProcessor:
 				try:
 					audio = EasyID3(filename)
 				except ID3NoHeaderError:
-					# Freshly transcoded MP3s have no ID3 tag yet: create one
+					# Freshly transcoded MP3s have no ID3 metadata yet: create one
 					audio = EasyID3()
 					audio.save(filename)
 					audio = EasyID3(filename)
@@ -326,8 +325,8 @@ class DownloadProcessor:
 				return
 
 		if ext == AppAudioFormat.MP3.ext:
-			# Map metadata tag names to mp3 ID3 tag names
-			id3_tag_map = {
+			# Map program metadata names to mp3 ID3 metadata names
+			id3_metadata_map = {
 				"album": "album",
 				"artist": "artist",
 				"albumartist": "albumartist",
@@ -336,19 +335,19 @@ class DownloadProcessor:
 				"tracknumber": "tracknumber",
 				"year": "date",
 			}
-			for meta_key, id3_key in id3_tag_map.items():
+			for meta_key, id3_key in id3_metadata_map.items():
 				if metadata.get(meta_key):
 					audio[id3_key] = str(metadata[meta_key])
 		elif ext == AppAudioFormat.M4A.ext:
-			# Map metadata tag names to MP4 atom keys
-			mp4_tag_map = {
+			# Map program metadata names to MP4 atom keys
+			mp4_metadata_map = {
 				"©alb": "album",
 				"©ART": "artist",
 				"aART": "albumartist",
 				"©nam": "title",
 				"©day": "year",
 			}
-			for atom_key, meta_key in mp4_tag_map.items():
+			for atom_key, meta_key in mp4_metadata_map.items():
 				if metadata.get(meta_key):
 					audio[atom_key] = [str(metadata[meta_key])]
 
@@ -503,9 +502,9 @@ def _build_file_index(download_dir):
 			filepath = os.path.join(root, filename)
 			if not _verify_audio_validity(filepath):
 				continue
-			tags = _read_track_tags(filepath)
-			if tags:
-				existing_items.add(tags)
+			item_metadata = _read_track_metadata(filepath)
+			if item_metadata:
+				existing_items.add(item_metadata)
 	return existing_items
 
 
@@ -617,7 +616,7 @@ def _get_collection_metadata(url, url_type):
 	return metadata_list, collection_name
 
 
-def _read_track_tags(filepath):
+def _read_track_metadata(filepath): #TODO might need a rename once episodes/podcasts are done
 	"""Reads (artist, title) from a file's metadata. Returns None if metadata was missing."""
 	ext = os.path.splitext(filepath)[1].lower()
 	try:
