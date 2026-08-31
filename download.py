@@ -35,6 +35,7 @@ from preference_manager import AppVerbosity
 # TODO when getting the 403 error for someone elses playlist, print a message that the playlist must be made by you
 # TODO add in extra prints if high verbosity
 # TODO add lyric download and metadata addition
+# TODO look into extra M3U complexities to see if they should be added
 def init_spotify_cred():
 	"""Initializes Spotipy with user authentication credentials."""
 	project_root = os.path.dirname(os.path.abspath(__file__))
@@ -251,7 +252,7 @@ class DownloadProcessor:
 		if file_ext == ".ogg" or not _FFMPEG_PATH:
 			if file_ext != ".ogg":
 				print(f"{WARN} ffmpeg unavailable. Defaulting to .ogg instead of {file_ext}.")
-				final_filename = f"{metadata['title']}.ogg"
+				final_filename = f"{sanitize_filename(metadata['title'])}.ogg"
 			os.rename(temp_ogg_filename, final_filename)
 		else:
 			try:
@@ -262,7 +263,7 @@ class DownloadProcessor:
 					raise Exception(f"{WARN} FFmpeg failed with code {result.returncode}")
 			except Exception as e:
 				print(f"{ERROR} Transcoding failed: {e}. Defaulting to original OGG container.")
-				final_filename = f"{metadata['title']}.ogg"
+				final_filename = f"{sanitize_filename(metadata['title'])}.ogg"
 				os.rename(temp_ogg_filename, final_filename)
 			finally:
 				if os.path.exists(temp_ogg_filename):
