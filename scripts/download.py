@@ -20,7 +20,7 @@ from librespot import metadata
 from scripts.config import AppAudioFormat
 from spotipy.exceptions import SpotifyException
 from scripts.m3u_generator import generate_m3u
-from scripts.utils import sanitize_filename
+from scripts.utils import sanitize_filename, format_custom_filename
 from spotipy.oauth2 import SpotifyOAuth
 from librespot.core import Session
 from librespot.metadata import TrackId, EpisodeId
@@ -82,7 +82,9 @@ _FFMPEG_PATH = _verify_ffmpeg_available()
 #TODO add a print out after establishing connection
 #TODO add blue to main menu
 #TODO work on first time user set up
-#TODO add in file name customization in the user prefs
+#TODO if a file is in another folder, when making the m3u, during skip add it to the m3u
+#TODO clean up vars that are consistent for an entire collection to be not passed but stored in self
+#TODO currently we recalculate the file name many times. this should be done once and passed along: format_custom_filename
 def _get_stream_session(verbosity):
 	"""Returns the current stream session, or builds a fresh one if dropped/idle."""
 	global SPOTIFY_STREAM_SESSION
@@ -185,17 +187,16 @@ class DownloadProcessor:
 
 		download_count = 0
 		processed_count = 0
+		filename_lookup = {}
 		try:
 			for index, metadata in download_order:
 				processed_count += 1
-				final_filename = f"{sanitize_filename(metadata['title'])}{file_ext}"
+				formatted_filename = format_custom_filename(self.settings.filename_format, metadata)
+				filename_lookup[metadata["id"]] = formatted_filename
 
 				# Check if the file is already downloaded
-				already_downloaded = (
-					metadata["title"] in existing_file_index
-					if existing_file_index is not None
-					else _verify_file_integrity(final_filename)
-				)
+				already_downloaded = (metadata["artist"], metadata["title"]) in existing_file_index
+
 				if already_downloaded:
 					if self.verbosity != AppVerbosity.LOW:
 						print(f"{c.magenta(f"[{processed_count:>{width}}/{total_tracks}]")} Skipping: {metadata['artist']} - {metadata['title']}")
@@ -209,7 +210,7 @@ class DownloadProcessor:
 					self.update_download_progress(index, total_tracks, metadata)
 
 				# The file is not downloaded, download it
-				success = self.download_item(metadata, "track") #TODO unhard code this when adding entire podcasts
+				success = self.download_item(metadata, "track", formatted_filename) #TODO unhard code this when adding entire podcasts
 				if not success:
 					continue
 				download_count += 1
@@ -229,13 +230,13 @@ class DownloadProcessor:
 						time.sleep(long_break)
 
 			if self.settings.generate_m3u:
-				generate_m3u(collection_name, metadata_list, collection_path, file_ext)
+				generate_m3u(collection_name, metadata_list, collection_path, file_ext, filename_lookup)
 				if self.verbosity != AppVerbosity.LOW:
 					print(f"{SUCC} M3U playlist created.")
 		finally:
 			os.chdir(original_dir) # cd back to the program directory
 
-	def download_item(self, metadata, url_type):
+	def download_item(self, metadata, url_type, formatted_filename):
 		match url_type:
 			case "track":
 				item_id = TrackId.from_base62(metadata["id"])
@@ -271,7 +272,7 @@ class DownloadProcessor:
 
 		file_ext = self.settings.audio_format.ext.lower().strip()
 		temp_ogg_filename = f"{metadata['title']}_temp{AppAudioFormat.OGG.ext}" #TODO save as .file so the user does not see it?
-		final_filename = f"{sanitize_filename(metadata['title'])}{file_ext}"
+		final_filename = f"{formatted_filename}{file_ext}"
 
 		with open(temp_ogg_filename, "wb") as f:
 			f.write(stream.input_stream.stream().read())
@@ -279,7 +280,7 @@ class DownloadProcessor:
 		if file_ext == AppAudioFormat.OGG.ext or not _FFMPEG_PATH:
 			if file_ext != AppAudioFormat.OGG.ext:
 				print(f"{WARN} ffmpeg unavailable. Defaulting to {AppAudioFormat.OGG.ext} instead of {file_ext}.")
-				final_filename = f"{sanitize_filename(metadata['title'])}{AppAudioFormat.OGG.ext}"
+				final_filename = f"{formatted_filename}{AppAudioFormat.OGG.ext}"
 			os.rename(temp_ogg_filename, final_filename)
 		else:
 			try:
@@ -290,7 +291,7 @@ class DownloadProcessor:
 					raise Exception(f"{WARN} FFmpeg failed with code {result.returncode}")
 			except Exception as e:
 				print(f"{ERROR} Transcoding failed: {e}. Defaulting to original OGG container.")
-				final_filename = f"{sanitize_filename(metadata['title'])}{AppAudioFormat.OGG.ext}"
+				final_filename = f"{formatted_filename}{AppAudioFormat.OGG.ext}"
 				os.rename(temp_ogg_filename, final_filename)
 			finally:
 				if os.path.exists(temp_ogg_filename):
@@ -411,7 +412,6 @@ class DownloadProcessor:
 			except Exception as e:
 				print(f"\t{WARN} Failed to embed album art due to network or format error: {e}")
 
-
 	def update_download_progress(self, current, total, metadata):
 		"""Update the progress bar print with the current information"""
 		if self.verbosity != AppVerbosity.LOW:
@@ -494,14 +494,18 @@ def _verify_file_integrity(filepath):
 
 
 def _build_file_index(download_dir):
-	"""Walks all folders under download_dir and returns the set of valid, already downloaded filenames"""
-	existing_files = set()
+	"""Walks all folders under download_dir and returns the set of (artist, title) tuples
+	for already downloaded items based on file metadata."""
+	existing_items = set()
 	for root, _dirs, files in os.walk(download_dir):
 		for filename in files:
-			if _verify_audio_validity(os.path.join(root, filename)):
-				title = os.path.splitext(filename)[0]
-				existing_files.add(title)
-	return existing_files
+			filepath = os.path.join(root, filename)
+			if not _verify_audio_validity(filepath):
+				continue
+			tags = _read_track_tags(filepath)
+			if tags:
+				existing_items.add(tags)
+	return existing_items
 
 
 def _build_item_metadata(track_data, collection_name, release_date, image_url):
@@ -610,6 +614,38 @@ def _get_collection_metadata(url, url_type):
 		metadata_list.append(track_metadata)
 
 	return metadata_list, collection_name
+
+
+def _read_track_tags(filepath):
+	"""Reads (artist, title) from a file's metadata. Returns None if metadata was missing."""
+	ext = os.path.splitext(filepath)[1].lower()
+	try:
+		match ext:
+			case AppAudioFormat.OGG.ext:
+				audio = OggVorbis(filepath)
+				artist = audio.get("artist", [""])[0]
+				title = audio.get("title", [""])[0]
+			case AppAudioFormat.FLAC.ext:
+				audio = FLAC(filepath)
+				artist = audio.get("artist", [""])[0]
+				title = audio.get("title", [""])[0]
+			case AppAudioFormat.MP3.ext:
+				audio = EasyID3(filepath)
+				artist = audio.get("artist", [""])[0]
+				title = audio.get("title", [""])[0]
+			case AppAudioFormat.M4A.ext:
+				audio = MP4(filepath)
+				artist = audio.get("©ART", [""])[0]
+				title = audio.get("©nam", [""])[0]
+			case _:
+				return None
+
+		if not artist or not title:
+			return None
+		return artist, title
+
+	except Exception:
+		return None
 
 
 def _safe_api_call(api_func, *args, **kwargs):

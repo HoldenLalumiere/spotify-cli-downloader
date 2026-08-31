@@ -27,7 +27,7 @@ def sanitize_filename(name):
 	illegal_chars = _get_illegal_chars()
 	cleaned = "".join(char for char in name if char not in illegal_chars).strip()
 	if sys.platform == "win32":
-		cleaned.rstrip(".")
+		cleaned = cleaned.rstrip(".")
 	return cleaned
 
 
@@ -66,7 +66,7 @@ def format_custom_filename(pattern, metadata):
 	if not pattern:
 		pattern = default_prefs["filename_format"]
 
-	token_re = re.compile(r'\\(\\|\\)|\|([a-zA-Z]+)\|')
+	token_re = re.compile(r'\\(\\|\|)|\|([a-zA-Z]+)\|')
 
 	def replace_token(match_obj):
 		escaped_char = match_obj.group(1)
