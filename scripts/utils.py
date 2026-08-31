@@ -1,3 +1,4 @@
+import os
 import re
 import sys
 
@@ -84,3 +85,48 @@ def format_custom_filename(pattern, metadata):
 
 	result_name = token_re.sub(replace_token, pattern)
 	return sanitize_filename(result_name)
+
+
+def validate_directory_path(path):
+	"""Validates the user entered directory path."""
+	path = path.strip()
+	if not path:
+		return False, "Path cannot be empty."
+
+	# Syntax Check: Is it a well-formed path
+	try:
+		resolved_path = os.path.abspath(path)
+	except (ValueError, OSError) as e:
+		return False, f"Invalid path: {e}"
+
+	# Windows Checks: Reserved names and illegal characters
+	if sys.platform == "win32":
+		illegal_chars = '<>"|?*'
+		reserved_names = {
+			"CON", "PRN", "AUX", "NUL",
+			*(f"COM{i}" for i in range(1, 10)),
+			*(f"LPT{i}" for i in range(1, 10)),
+		}
+
+		for segment in resolved_path.split(os.sep):
+			if any(char in segment for char in illegal_chars):
+				return False, f"Path contains characters not allowed on Windows: {illegal_chars}"
+			if segment.upper() in reserved_names:
+				return False, f"'{segment}' is a reserved name on Windows and can't be used as a folder name."
+
+	# Practical Check: If it exists, it must be a directory
+	if os.path.exists(resolved_path) and not os.path.isdir(resolved_path):
+		return False, f"'{resolved_path}' exists and is not a directory."
+
+	# Practical Check: Is it writable
+	nearest_existing = resolved_path
+	while not os.path.exists(nearest_existing):
+		parent = os.path.dirname(nearest_existing)
+		if parent == nearest_existing:
+			break # Filesystem root reached
+		nearest_existing = parent
+
+	if not os.access(nearest_existing, os.W_OK):
+		return False, f"'{nearest_existing}' is not writable."
+
+	return True, resolved_path

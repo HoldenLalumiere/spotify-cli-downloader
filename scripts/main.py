@@ -2,16 +2,15 @@ import os
 import re
 import sys
 import textwrap
-from traceback import print_exc
-from urllib.parse import urlparse
 
+from urllib.parse import urlparse
 from scripts.download import download_url
 from scripts.config import AUDIO_FORMAT_MAP, AUDIO_QUALITY_MAP, VERBOSITY_MAP
 from scripts.preference_manager import save_preferences, user_prefs, default_prefs
 from scripts.constants import c, SAVED, ERROR, WARN, SUCC
 from dataclasses import dataclass
 from scripts.credential_manager import save_to_env
-from scripts.utils import VALID_FILENAME_KEYWORDS, validate_filename_pattern
+from scripts.utils import VALID_FILENAME_KEYWORDS, validate_filename_pattern, validate_directory_path
 
 
 if sys.platform == "win32":
@@ -61,14 +60,22 @@ def prompt_download_dir(current_value, is_preference=False):
 		print(textwrap.dedent("\n".join(menu_lines)).strip())
 		choice = input("> ").strip()
 
-		if choice.lower() in ('b', '') or choice is None:
-			return "back"
-		elif choice.lower() == 'r' and is_preference:
-			return "reset"
-		elif choice:
-			return choice
-		else:
-			print(f"{ERROR} Path cannot be empty.")
+		match choice:
+			case "b" | "B" | "" | None:
+				return "back"
+
+			case "r" | "R" if is_preference:
+				return "reset"
+
+			case _ if choice:
+				is_valid, result = validate_directory_path(choice)
+				if not is_valid:
+					print(f"{ERROR} {result}\n")
+					continue
+				return result
+
+			case _:
+				print(f"{ERROR} Path cannot be empty.")
 
 def prompt_audio_format(current_value, is_preference=False):
 	"""Handles the UI and input collection for choosing an audio format."""
@@ -91,18 +98,22 @@ def prompt_audio_format(current_value, is_preference=False):
 		print(textwrap.dedent("\n".join(menu_lines)).strip())
 		choice = input("> ").strip()
 
-		if choice in AUDIO_FORMAT_MAP:
-			format_enum = AUDIO_FORMAT_MAP[choice]
-			if not format_enum.implemented:
-				print(f"{ERROR} {format_enum.label} is not supported yet.\n")
-				continue
-			return format_enum
-		elif choice.lower() == "r" and is_preference:
-			return "reset"
-		elif choice.lower() in ("b", "") or choice is None:
-			return "back"
-		else:
-			print_default_invalid_input()
+		match choice:
+			case "b" | "B" | "" | None:
+				return "back"
+
+			case "r" | "R" if is_preference:
+				return "reset"
+
+			case _ if choice in AUDIO_FORMAT_MAP:
+				format_enum = AUDIO_FORMAT_MAP[choice]
+				if not format_enum.implemented:
+					print(f"{ERROR} {format_enum.label} is not supported yet.\n")
+					continue
+				return format_enum
+
+			case _:
+				print_default_invalid_input()
 
 def prompt_audio_quality(current_value, is_preference=False):
 	"""Handles the UI and input collection for choosing audio quality."""
@@ -125,18 +136,22 @@ def prompt_audio_quality(current_value, is_preference=False):
 		print(textwrap.dedent("\n".join(menu_lines)).strip())
 		choice = input("> ").strip()
 
-		if choice in AUDIO_QUALITY_MAP:
-			quality_enum = AUDIO_QUALITY_MAP[choice]
-			if not quality_enum.implemented:
-				print(f"{ERROR} {quality_enum.label} is not supported yet.\n")
-				continue
-			return quality_enum
-		elif choice.lower() == 'r' and is_preference:
-			return "reset"
-		elif choice.lower() in ('b', '') or choice is None:
-			return "back"
-		else:
-			print_default_invalid_input()
+		match choice:
+			case "b" | "B" | "" | None:
+				return "back"
+
+			case "r" | "R" if is_preference:
+				return "reset"
+
+			case _ if choice in AUDIO_QUALITY_MAP:
+				quality_enum = AUDIO_QUALITY_MAP[choice]
+				if not quality_enum.implemented:
+					print(f"{ERROR} {quality_enum.label} is not supported yet.\n")
+					continue
+				return quality_enum
+
+			case _:
+				print_default_invalid_input()
 
 def handle_pre_download_menu():
 	download_dir = user_prefs["download_dir"]
@@ -187,7 +202,7 @@ def handle_download_menu(settings):
 		print_download_menu(settings)
 		url = input("> ").strip()
 		match url:
-			case "b" | "B" | '' | None:
+			case "b" | "B" | "" | None:
 				break
 
 			case _ if is_valid_spotify_url(url):
@@ -243,7 +258,7 @@ def handle_preferences_menu():
 				handle_credentials_menu()
 			case "r" | "R":
 				pass #TODO
-			case "b" | "B" | '' | None:
+			case "b" | "B" | "" | None:
 				break
 			case _:
 				print_default_invalid_input()
@@ -382,7 +397,7 @@ def handle_bypass_menu():
 				print(f"{SAVED} Preference cleared (Bypass set to Off).\n") #TODO make this print dynamic based on default_prefs
 				break
 
-			case "b" | "B" | '' | None:
+			case "b" | "B" | "" | None:
 				break
 
 			case _:
@@ -430,7 +445,7 @@ def handle_verbosity_menu():
 				print(f"{SAVED} Preference reset to default (Medium).\n") #TODO make this print dynamic based on default_prefs
 				break
 
-			case "b" | "B" | '' | None:
+			case "b" | "B" | "" | None:
 				break
 
 			case _:
@@ -474,7 +489,7 @@ def handle_duplicate_check_menu():
 				print(f"{SAVED} Preference cleared (set to check working folder).\n")
 				break
 
-			case "b" | "B" | '' | None:
+			case "b" | "B" | "" | None:
 				break
 			case _:
 				print_default_invalid_input()
@@ -516,7 +531,7 @@ def handle_generate_m3u_menu():
 				print(f"{SAVED} Preference cleared (set to Off).\n")
 				break
 
-			case "b" | "B" | '' | None:
+			case "b" | "B" | "" | None:
 				break
 
 			case _:
@@ -551,7 +566,7 @@ def handle_filename_menu():
 				print(f"{SAVED} Preference reset to default (|title|).\n")  #TODO make this print dynamic based on default_prefs
 				break
 
-			case "b" | "B" | '' | None:
+			case "b" | "B" | "" | None:
 				break
 
 			case _:
@@ -660,7 +675,7 @@ def handle_id_credentials_menu():
 			case "h" | "H":
 				print_id_credentials_help()
 
-			case "b" | "B" | '' | None:
+			case "b" | "B" | "" | None:
 				return "back"
 
 			case _ if is_valid_spotify_hex(choice):
@@ -680,7 +695,7 @@ def handle_secret_credentials_menu():
 			case "h" | "H":
 				print_secret_credentials_help()
 
-			case "b" | "B" | '' | None:
+			case "b" | "B" | "" | None:
 				return "back"
 
 			case _ if is_valid_spotify_hex(choice):
@@ -697,7 +712,7 @@ def handle_redirect_credentials_menu():
 		choice = input("> ").strip()
 
 		match choice:
-			case "b" | "B" | '' | None:
+			case "b" | "B" | "" | None:
 				return "back"
 
 			case _ if is_valid_url(choice):
