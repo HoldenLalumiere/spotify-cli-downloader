@@ -1,17 +1,15 @@
 import os
-import re
 import sys
 import textwrap
 
-from urllib.parse import urlparse
 from scripts.download import download_url
 from scripts.config import AUDIO_FORMAT_MAP, AUDIO_QUALITY_MAP, VERBOSITY_MAP
 from scripts.preference_manager import save_preferences, user_prefs, default_prefs
 from scripts.constants import c, SAVED, ERROR, WARN, SUCC
 from dataclasses import dataclass
 from scripts.credential_manager import save_to_env
-from scripts.utils import VALID_FILENAME_KEYWORDS, validate_filename_pattern, validate_directory_path
-
+from scripts.utils import VALID_FILENAME_KEYWORDS, is_valid_filename_pattern, is_valid_directory_path, \
+	is_valid_spotify_hex, is_valid_url, is_valid_spotify_url
 
 if sys.platform == "win32":
 	os.system("color")
@@ -68,7 +66,7 @@ def prompt_download_dir(current_value, is_preference=False):
 				return "reset"
 
 			case _ if choice:
-				is_valid, result = validate_directory_path(choice)
+				is_valid, result = is_valid_directory_path(choice)
 				if not is_valid:
 					print(f"{ERROR} {result}\n")
 					continue
@@ -570,7 +568,7 @@ def handle_filename_menu():
 				break
 
 			case _:
-				is_valid, error_msg = validate_filename_pattern(choice)
+				is_valid, error_msg = is_valid_filename_pattern(choice)
 				if not is_valid:
 					print(f"{ERROR} {error_msg}\n")
 					continue
@@ -723,31 +721,7 @@ def handle_redirect_credentials_menu():
 			case _:
 				print(f"{ERROR} Invalid Redirect URI. Please enter a valid URL (e.g., http://localhost:8080).")
 
-def is_valid_spotify_url(url):
-	# Not valid if blank/None
-	if not url or not isinstance(url, str):
-		return False
 
-	# Regex:
-	# 1. Matches either a web URL with subdomains (open, www, play) OR the native spotify: protocol
-	# 2. Ensures a valid media type path (track, album, playlist, artist, show, episode)
-	# 3. Validates the 22-character alphanumeric Spotify ID
-	pattern = r"^(?:(https?://(?:open|www|play)\.spotify\.com/(track|album|playlist|episode)/[a-zA-Z0-9]{22}(?:/|\?.*)?)|(spotify:(track|album|playlist|artist|show|episode):[a-zA-Z0-9]{22}))$"
-	# pattern = r"^(?:(https?://(?:open|www|play)\.spotify\.com/(track|album|playlist|artist|show|episode)/[a-zA-Z0-9]{22}(?:/|\?.*)?)|(spotify:(track|album|playlist|artist|show|episode):[a-zA-Z0-9]{22}))$"
-	return bool(re.match(pattern, url.strip()))
-
-def is_valid_spotify_hex(token):
-	"""Spotify Client IDs and Secrets are 32-character lowercase Hexadecimal strings."""
-	# Matches exactly 32 alphanumeric hex characters (0-9, a-f)
-	return bool(re.match(r"^[0-9a-f]{32}$", token.strip()))
-
-def is_valid_url(url):
-	"""Verifies the redirect URI is a syntactically valid web link."""
-	try:
-		parsed = urlparse(url.strip())
-		return all([parsed.scheme, parsed.netloc])
-	except Exception:
-		return False
 
 #TODO add option to reset credential
 #TODO implement artist support ???

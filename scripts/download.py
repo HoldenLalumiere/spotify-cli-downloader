@@ -20,7 +20,7 @@ from librespot import metadata
 from scripts.config import AppAudioFormat
 from spotipy.exceptions import SpotifyException
 from scripts.m3u_generator import generate_m3u
-from scripts.utils import sanitize_filename, format_custom_filename
+from scripts.utils import sanitize_filename, format_custom_filename, _get_url_id
 from spotipy.oauth2 import SpotifyOAuth
 from librespot.core import Session
 from librespot.metadata import TrackId, EpisodeId
@@ -455,12 +455,8 @@ class DownloadProcessor:
 
 
 ### Helper Functions ###
-def _get_url_id(url):
-	return url.split("/")[-1].split("?")[0]
-
-
-def _verify_audio_validity(filepath):
-	"""Checks if the given file is a valid audio file that can be parsed by Mutagen"""
+def _is_valid_audio(filepath):
+	"""Validates a given file's audio, meaning it can be parsed by Mutagen"""
 	if not os.path.exists(filepath):
 		return False
 	ext = os.path.splitext(filepath)[1].lower()
@@ -485,7 +481,7 @@ def _verify_file_integrity(filepath):
 	"""Checks if a file exists and can be successfully read/parsed by Mutagen. Deletes if corrupted."""
 	if not os.path.exists(filepath):
 		return False
-	if _verify_audio_validity(filepath):
+	if _is_valid_audio(filepath):
 		return True
 	print(f"\t{WARN} Existing '{os.path.basename(filepath)}' is corrupted. Overwriting...")
 	try:
@@ -502,7 +498,7 @@ def _build_file_index(download_dir):
 	for root, _dirs, files in os.walk(download_dir):
 		for filename in files:
 			filepath = os.path.join(root, filename)
-			if not _verify_audio_validity(filepath):
+			if not _is_valid_audio(filepath):
 				continue
 			item_metadata = _read_track_metadata(filepath)
 			if item_metadata:

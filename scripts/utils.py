@@ -2,7 +2,9 @@ import os
 import re
 import sys
 
+from urllib.parse import urlparse
 from scripts.preference_manager import default_prefs
+
 
 _ILLEGAL_FILENAME_CHARS_WINDOWS = '<>:"/\\|?*'
 _ILLEGAL_FILENAME_CHARS_POSIX = '/'
@@ -18,6 +20,7 @@ VALID_FILENAME_KEYWORDS = [
     "id"
 ]
 
+
 def _get_illegal_chars():
 	"""Returns the set of chars that are illegal in a filename for the current OS."""
 	return _ILLEGAL_FILENAME_CHARS_WINDOWS if sys.platform == "win32" else _ILLEGAL_FILENAME_CHARS_POSIX
@@ -32,12 +35,12 @@ def sanitize_filename(name):
 	return cleaned
 
 
-def validate_filename_pattern(pattern):
+def is_valid_filename_pattern(pattern):
 	"""Validates the user entered filename pattern."""
 	if not pattern:
 		return False, "Pattern cannot be empty" # This will not happen because of the Back functionality
 
-	if re.search(r'(?<!\\)\\(?!\\|\|)', pattern):
+	if re.search(r'(?<!\\)\\(?![\\|])', pattern):
 		return False, "Invalid escape sequence. Only '\\|' and '\\\\' are supported."
 
 	# Remove all valid uses of \\ and \| so we can check for single |'s
@@ -67,7 +70,7 @@ def format_custom_filename(pattern, metadata):
 	if not pattern:
 		pattern = default_prefs["filename_format"]
 
-	token_re = re.compile(r'\\(\\|\|)|\|([a-zA-Z]+)\|')
+	token_re = re.compile(r'\\([\\|])|\|([a-zA-Z]+)\|')
 
 	def replace_token(match_obj):
 		escaped_char = match_obj.group(1)
@@ -87,15 +90,15 @@ def format_custom_filename(pattern, metadata):
 	return sanitize_filename(result_name)
 
 
-def validate_directory_path(path):
+def is_valid_directory_path(dir_path: str):
 	"""Validates the user entered directory path."""
-	path = path.strip()
-	if not path:
+	dir_path = dir_path.strip()
+	if not dir_path:
 		return False, "Path cannot be empty."
 
 	# Syntax Check: Is it a well-formed path
 	try:
-		resolved_path = os.path.abspath(path)
+		resolved_path = os.path.abspath(dir_path)
 	except (ValueError, OSError) as e:
 		return False, f"Invalid path: {e}"
 
@@ -130,3 +133,36 @@ def validate_directory_path(path):
 		return False, f"'{nearest_existing}' is not writable."
 
 	return True, resolved_path
+
+
+def is_valid_spotify_url(url):
+	# Not valid if blank/None
+	if not url or not isinstance(url, str):
+		return False
+
+	# Regex:
+	# 1. Matches either a web URL with subdomains (open, www, play) OR the native spotify: protocol
+	# 2. Ensures a valid media type path (track, album, playlist, artist, show, episode)
+	# 3. Validates the 22-character alphanumeric Spotify ID
+	pattern = r"^(?:(https?://(?:open|www|play)\.spotify\.com/(track|album|playlist|episode)/[a-zA-Z0-9]{22}(?:/|\?.*)?)|(spotify:(track|album|playlist|artist|show|episode):[a-zA-Z0-9]{22}))$"
+	# pattern = r"^(?:(https?://(?:open|www|play)\.spotify\.com/(track|album|playlist|artist|show|episode)/[a-zA-Z0-9]{22}(?:/|\?.*)?)|(spotify:(track|album|playlist|artist|show|episode):[a-zA-Z0-9]{22}))$"
+	return bool(re.match(pattern, url.strip()))
+
+
+def is_valid_spotify_hex(token):
+	"""Spotify Client IDs and Secrets are 32-character lowercase Hexadecimal strings."""
+	# Matches exactly 32 alphanumeric hex characters (0-9, a-f)
+	return bool(re.match(r"^[0-9a-f]{32}$", token.strip()))
+
+
+def is_valid_url(url):
+	"""Verifies the redirect URI is a syntactically valid web link."""
+	try:
+		parsed = urlparse(url.strip())
+		return all([parsed.scheme, parsed.netloc])
+	except Exception:
+		return False
+
+
+def _get_url_id(url):
+	return url.split("/")[-1].split("?")[0]
