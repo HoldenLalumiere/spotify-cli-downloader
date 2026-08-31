@@ -27,6 +27,7 @@ from mutagen.oggvorbis import OggVorbis
 from constants import c, SAVED, ERROR, WARN, SUCC, WAIT
 from preference_manager import AppVerbosity
 
+# TODO fix print order, print downloading after establishing connection
 # TODO I don't think that it can handle album names with ! in them
 # TODO implement switching between different audio formats
 # TODO when getting the 403 error for someone elses playlist, print a message that the playlist must be made by you
@@ -73,6 +74,12 @@ _FFMPEG_PATH = _verify_ffmpeg_available()
 #TODO rename tags to metadata
 #TODO add a print out after establishing connection
 #TODO add blue to main menu
+#TODO work on first time user set up
+#TODO add in file name customization in the user prefs
+#TODO add in .m3u generation if in user prefs
+#TODO add in mp3 support
+#TODO skirt right under the spotify request limit instead of adding random time
+#TODO randomize the download order for each page (50 items i believe)
 def _get_stream_session(verbosity):
 	"""Returns the current stream session, or builds a fresh one if dropped/idle."""
 	global SPOTIFY_STREAM_SESSION
@@ -163,13 +170,21 @@ class DownloadProcessor:
 
 		file_ext = self.settings.audio_format.ext.lower().strip()
 
+		search_root = download_dir if self.settings.check_all_folders else collection_path
+		existing_file_index = _build_file_index(search_root)
+
 		download_count = 0
 		try:
 			for index, metadata in enumerate(metadata_list, start=1):
 				final_filename = f"{metadata["title"]}{file_ext}"
 
 				# Check if the file is already downloaded
-				if _verify_file_integrity(final_filename):
+				already_downloaded = (
+					metadata["title"] in existing_file_index
+					if existing_file_index is not None
+					else _verify_file_integrity(final_filename)
+				)
+				if already_downloaded:
 					if self.verbosity != AppVerbosity.LOW:
 						print(f"{c.magenta(f"[{index:>{width}}/{total_tracks}]")} Skipping: {metadata['artist']} - {metadata['title']}")
 					else:
@@ -339,20 +354,47 @@ def _get_url_id(url):
 	return url.split("/")[-1].split("?")[0]
 
 
-def _verify_file_integrity(filepath):
-	"""Checks if a file exists and can be successfully read/parsed by Mutagen."""
+def _verify_audio_validity(filepath):
+	"""Checks if the given file is a valid audio file that can be parsed by Mutagen"""
 	if not os.path.exists(filepath):
 		return False
+	ext = os.path.splitext(filepath)[1].lower()
 	try:
-		OggVorbis(filepath)
+		match ext:
+			case ".ogg":
+				OggVorbis(filepath)
+			case ".flac":
+				FLAC(filepath)
+			case _:
+				return False
 		return True
-	except Exception as e:
-		print(f"\t{WARN} Existing'{os.path.basename(filepath)}' is corrupted/incomplete. Overwriting...")
-		try:
-			os.remove(filepath)
-		except OSError:
-			pass
+	except Exception:
 		return False
+
+
+def _verify_file_integrity(filepath):
+	"""Checks if a file exists and can be successfully read/parsed by Mutagen. Deletes if corrupted."""
+	if not os.path.exists(filepath):
+		return False
+	if _verify_audio_validity(filepath):
+		return True
+	print(f"\t{WARN} Existing '{os.path.basename(filepath)}' is corrupted. Overwriting...")
+	try:
+		os.remove(filepath)
+	except OSError:
+		pass
+	return False
+
+
+def _build_file_index(download_dir):
+	"""Walks all folders under download_dir and returns the set of valid, already downloaded filenames"""
+	existing_files = set()
+	for root, _dirs, files in os.walk(download_dir):
+		for filename in files:
+			if _verify_audio_validity(os.path.join(root, filename)):
+				title = os.path.splitext(filename)[0]
+				existing_files.add(title)
+	return existing_files
 
 
 def _build_item_metadata(track_data, collection_name, release_date, image_url):

@@ -10,11 +10,12 @@ user_prefs = {}
 
 # Default preferences
 default_prefs = {
-    "download_dir":     None,
-    "audio_format":     None,
-    "audio_quality":    None,
-	"bypass_main_menu": False,
-	"verbosity":        AppVerbosity.MEDIUM
+    "download_dir":      None,
+    "audio_format":      None,
+    "audio_quality":     None,
+	"bypass_main_menu":  False,
+	"verbosity":         AppVerbosity.MEDIUM,
+	"check_all_folders": False,
 }
 
 def load_preferences():

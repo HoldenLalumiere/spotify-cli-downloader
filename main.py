@@ -14,16 +14,19 @@ from credential_manager import save_to_env
 
 
 if sys.platform == "win32":
-    os.system("color")
+	os.system("color")
 
 # TODO ensure all prints end in a `.`
 # TODO implement an h option which will print what the setting does
 # TODO enforce that all printed lines fit in 50 chars (maybe 80)
+# TODO add in user pref, if file exists with different ext, replace, download, or skip (default is to skip)
 @dataclass
 class DownloadSettings:
 	download_dir: str
 	audio_format: str
 	audio_quality: str
+	check_all_folders: bool
+
 
 def print_default_invalid_input():
 	print(f"{ERROR} Invalid choice. Please enter a valid option\n")
@@ -151,7 +154,9 @@ def handle_pre_download_menu():
 		if result == "back": return
 		audio_quality = result
 
-	download_settings = DownloadSettings(download_dir, audio_format, audio_quality) #TODO look into these yellow lines
+	check_all_folders = user_prefs["check_all_folders"]
+
+	download_settings = DownloadSettings(download_dir, audio_format, audio_quality, check_all_folders) #TODO look into these yellow lines
 	handle_download_menu(download_settings)
 
 def print_download_menu(settings):
@@ -199,8 +204,9 @@ def print_preferences_menu():
 			\t3. Audio Quality
 			\t4. Toggle Main Menu Bypass (Start in Download Menu)
 			\t5. Verbosity
-			\t6. Spotify API Credentials (.env)
-			\t7. {c.red("Spotify session stuff (might happen naturally)")}
+			\t6. Duplicate Checking
+			\t7. Spotify API Credentials (.env)
+			\t8. {c.red("Spotify session stuff (might happen naturally)")}
 			\tr. {c.red("TODO add reset all functionality")}
 			\tb. Back""").strip()
 	print(menu_text)
@@ -221,6 +227,8 @@ def handle_preferences_menu():
 			case "5":
 				handle_verbosity_menu()
 			case "6":
+				handle_duplicate_check_menu()
+			case "7":
 				handle_credentials_menu()
 			case "r" | "R":
 				pass #TODO
@@ -410,6 +418,46 @@ def handle_verbosity_menu():
 			case "b" | "B" | '' | None:
 				break
 
+			case _:
+				print_default_invalid_input()
+
+def print_duplicate_check_menu():
+	curr_label = "Checking all folders" if user_prefs["check_all_folders"] else "Checking current folder only"
+	menu_text = textwrap.dedent(f"""
+			--- {c.blue("Change Duplicate Checking Preference", b=True)} ---
+			Current Preference: {c.cyan(curr_label)}
+			If on, downloads are skipped if the track already exists
+			anywhere under your download directory, not just the
+			current album/playlist's folder
+			\t1. Check All Folders
+			\t2. Check Working Folder
+			\tr. Reset Preference
+			\tb. Back""").strip()
+	print(menu_text)
+
+def handle_duplicate_check_menu():
+	while True:
+		print_duplicate_check_menu()
+		choice = input("> ").strip()
+
+		match choice:
+			case "1":
+				user_prefs["check_all_folders"] = True
+				save_preferences()
+				print(f"{SAVED} Updated to check all folders.\n")
+				break
+			case "2":
+				user_prefs["check_all_folders"] = False
+				save_preferences()
+				print(f"{SAVED} Updated to check working folder.\n")
+				break
+			case "r" | "R":
+				user_prefs["check_all_folders"] = False
+				save_preferences()
+				print(f"{SAVED} Preference cleared (set to check working folder).\n")
+				break
+			case "b" | "B" | '' | None:
+				break
 			case _:
 				print_default_invalid_input()
 
