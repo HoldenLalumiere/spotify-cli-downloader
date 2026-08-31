@@ -83,8 +83,6 @@ _FFMPEG_PATH = _verify_ffmpeg_available()
 #TODO add blue to main menu
 #TODO work on first time user set up
 #TODO if a file is in another folder, when making the m3u, during skip add it to the m3u
-#TODO clean up vars that are consistent for an entire collection to be not passed but stored in self
-#TODO currently we recalculate the file name many times. this should be done once and passed along: format_custom_filename
 def _get_stream_session(verbosity):
 	"""Returns the current stream session, or builds a fresh one if dropped/idle."""
 	global SPOTIFY_STREAM_SESSION
@@ -149,6 +147,9 @@ class DownloadProcessor:
 						case _:
 							raise Exception("Unknown URL type") # This should never happen
 
+					self.file_ext = self.settings.audio_format.ext.lower().strip()
+					self.filename_lookup = {metadata["id"]: format_custom_filename(self.settings.filename_format, metadata)}
+
 					_get_stream_session(self.verbosity)
 					print(f"Downloading: {super_title} - {metadata["title"]}")
 					self.download_item(metadata, url_type)
@@ -166,16 +167,16 @@ class DownloadProcessor:
 		safe_collection_name = sanitize_filename(collection_name)
 
 		# Change directory to that collection in their preferred download directory
-		collection_path = os.path.join(download_dir, safe_collection_name)
-		folder_exists = os.path.exists(collection_path)
-		os.makedirs(collection_path, exist_ok=True)
-		os.chdir(collection_path)
+		self.collection_path = os.path.join(download_dir, safe_collection_name)
+		folder_exists = os.path.exists(self.collection_path)
+		os.makedirs(self.collection_path, exist_ok=True)
+		os.chdir(self.collection_path)
 		if not folder_exists:
 			print(f"{SUCC} Created folder: {os.getcwd()}")
 
-		file_ext = self.settings.audio_format.ext.lower().strip()
+		self.file_ext = self.settings.audio_format.ext.lower().strip()
 
-		search_root = download_dir if self.settings.check_all_folders else collection_path
+		search_root = download_dir if self.settings.check_all_folders else self.collection_path
 		existing_file_index = _build_file_index(search_root)
 
 		_get_stream_session(self.verbosity)
@@ -187,12 +188,12 @@ class DownloadProcessor:
 
 		download_count = 0
 		processed_count = 0
-		filename_lookup = {}
+		self.filename_lookup = {}
 		try:
 			for index, metadata in download_order:
 				processed_count += 1
 				formatted_filename = format_custom_filename(self.settings.filename_format, metadata)
-				filename_lookup[metadata["id"]] = formatted_filename
+				self.filename_lookup[metadata["id"]] = formatted_filename
 
 				# Check if the file is already downloaded
 				already_downloaded = (metadata["artist"], metadata["title"]) in existing_file_index
@@ -210,7 +211,7 @@ class DownloadProcessor:
 					self.update_download_progress(index, total_tracks, metadata)
 
 				# The file is not downloaded, download it
-				success = self.download_item(metadata, "track", formatted_filename) #TODO unhard code this when adding entire podcasts
+				success = self.download_item(metadata, "track") #TODO unhard code this when adding entire podcasts
 				if not success:
 					continue
 				download_count += 1
@@ -230,13 +231,13 @@ class DownloadProcessor:
 						time.sleep(long_break)
 
 			if self.settings.generate_m3u:
-				generate_m3u(collection_name, metadata_list, collection_path, file_ext, filename_lookup)
+				generate_m3u(collection_name, metadata_list, self.collection_path, self.file_ext, self.filename_lookup)
 				if self.verbosity != AppVerbosity.LOW:
 					print(f"{SUCC} M3U playlist created.")
 		finally:
 			os.chdir(original_dir) # cd back to the program directory
 
-	def download_item(self, metadata, url_type, formatted_filename):
+	def download_item(self, metadata, url_type):
 		match url_type:
 			case "track":
 				item_id = TrackId.from_base62(metadata["id"])
@@ -270,16 +271,16 @@ class DownloadProcessor:
 					print(f"\t{ERROR} Skipping '{metadata['title']}': unable to fetch audio key after {audio_key_retries} attempts ({e}).")
 					return False
 
-		file_ext = self.settings.audio_format.ext.lower().strip()
+		formatted_filename = self.filename_lookup[metadata["id"]]
 		temp_ogg_filename = f"{metadata['title']}_temp{AppAudioFormat.OGG.ext}" #TODO save as .file so the user does not see it?
-		final_filename = f"{formatted_filename}{file_ext}"
+		final_filename = f"{formatted_filename}{self.file_ext}"
 
 		with open(temp_ogg_filename, "wb") as f:
 			f.write(stream.input_stream.stream().read())
 
-		if file_ext == AppAudioFormat.OGG.ext or not _FFMPEG_PATH:
-			if file_ext != AppAudioFormat.OGG.ext:
-				print(f"{WARN} ffmpeg unavailable. Defaulting to {AppAudioFormat.OGG.ext} instead of {file_ext}.")
+		if self.file_ext == AppAudioFormat.OGG.ext or not _FFMPEG_PATH:
+			if self.file_ext != AppAudioFormat.OGG.ext:
+				print(f"{WARN} ffmpeg unavailable. Defaulting to {AppAudioFormat.OGG.ext} instead of {self.file_ext}.")
 				final_filename = f"{formatted_filename}{AppAudioFormat.OGG.ext}"
 			os.rename(temp_ogg_filename, final_filename)
 		else:
