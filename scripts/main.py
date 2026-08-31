@@ -289,7 +289,7 @@ def handle_download_dir_menu():
 		case "back":
 			pass
 
-		case _:  # TODO check that they Returned a valid string path based on their OS
+		case _:
 			user_prefs["download_dir"] = result
 			save_preferences()
 			print(f"{SAVED} Download location updated to {result}.\n")
