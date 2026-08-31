@@ -83,7 +83,6 @@ _FFMPEG_PATH = _verify_ffmpeg_available()
 #TODO add blue to main menu
 #TODO work on first time user set up
 #TODO add in file name customization in the user prefs
-#TODO randomize the download order for each page (50 items i believe)
 def _get_stream_session(verbosity):
 	"""Returns the current stream session, or builds a fresh one if dropped/idle."""
 	global SPOTIFY_STREAM_SESSION
@@ -185,8 +184,10 @@ class DownloadProcessor:
 		random.shuffle(download_order)
 
 		download_count = 0
+		processed_count = 0
 		try:
 			for index, metadata in download_order:
+				processed_count += 1
 				final_filename = f"{sanitize_filename(metadata['title'])}{file_ext}"
 
 				# Check if the file is already downloaded
@@ -197,13 +198,13 @@ class DownloadProcessor:
 				)
 				if already_downloaded:
 					if self.verbosity != AppVerbosity.LOW:
-						print(f"{c.magenta(f"[{index:>{width}}/{total_tracks}]")} Skipping: {metadata['artist']} - {metadata['title']}")
+						print(f"{c.magenta(f"[{processed_count:>{width}}/{total_tracks}]")} Skipping: {metadata['artist']} - {metadata['title']}")
 					else:
 						self.update_download_progress(index, total_tracks, metadata)
 					continue
 
 				if self.verbosity != AppVerbosity.LOW:
-					print(f"{c.cyan(f"[{index:>{width}}/{total_tracks}]")} Downloading: {metadata["artist"]} - {metadata["title"]}")
+					print(f"{c.cyan(f"[{processed_count:>{width}}/{total_tracks}]")} Downloading: {metadata["artist"]} - {metadata["title"]}")
 				else:
 					self.update_download_progress(index, total_tracks, metadata)
 
