@@ -78,7 +78,6 @@ _FFMPEG_PATH = _verify_ffmpeg_available()
 
 #TODO add this line in if first time `logging.basicConfig(level=logging.DEBUG)`
 #TODO force the same python packages for all
-#TODO add a print out after establishing connection
 #TODO add blue to main menu
 #TODO work on first time user set up
 #TODO if a file is in another folder, when making the m3u, during skip add it to the m3u
@@ -87,7 +86,7 @@ def _get_stream_session(verbosity):
 	global SPOTIFY_STREAM_SESSION
 	if SPOTIFY_STREAM_SESSION is None or not SPOTIFY_STREAM_SESSION.is_valid():
 		if verbosity != AppVerbosity.LOW:
-			print("\tEstablishing active Spotify streaming connection...")
+			print(f"{WAIT} Establishing active Spotify streaming connection...")
 
 		auth_token = _get_auth_token()
 		if auth_token:
@@ -99,6 +98,9 @@ def _get_stream_session(verbosity):
 		else:
 			# Fallback as unauthenticated if no token is passed
 			SPOTIFY_STREAM_SESSION = Session.Builder().oauth(None).create()
+
+		if verbosity != AppVerbosity.LOW:
+			print(f"{SUCC} Connection established.")
 	return SPOTIFY_STREAM_SESSION
 
 
