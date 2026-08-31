@@ -5,7 +5,8 @@ from scripts.config import AppAudioFormat, AppAudioQuality, AppVerbosity
 from scripts.constants import ERROR
 
 ### Global Variables ###
-CONFIG_FILE = "../config.json"
+_PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
+CONFIG_FILE = os.path.join(_PROJECT_ROOT, "..", "config.json")
 user_prefs = {}
 
 # Default preferences

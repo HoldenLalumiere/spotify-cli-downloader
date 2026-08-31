@@ -268,12 +268,12 @@ def handle_download_dir_menu():
 	result = prompt_download_dir(user_prefs["download_dir"], is_preference=True)
 
 	match result:
-		case "r" | "R":
+		case "reset":
 			user_prefs["download_dir"] = default_prefs["download_dir"]
 			save_preferences()
 			print(f"{SAVED} Preference cleared.\n")
 
-		case "b" | "B" | '' | None:
+		case "back":
 			pass
 
 		case _:  # TODO check that they Returned a valid string path based on their OS
@@ -300,12 +300,12 @@ def handle_audio_format_menu():
 	result = prompt_audio_format(user_prefs["audio_format"], is_preference=True)
 
 	match result:
-		case "r" | "R":
+		case "reset":
 			user_prefs["audio_format"] = default_prefs["audio_format"]
 			save_preferences()
 			print(f"{SAVED} Preference cleared.\n")
 
-		case "b" | "B" | '' | None:
+		case "back":
 			pass
 
 		case _:  # Returned a valid format enum
@@ -332,12 +332,12 @@ def handle_audio_quality_menu():
 	result = prompt_audio_quality(user_prefs["audio_quality"], is_preference=True)
 
 	match result:
-		case "r" | "R":
+		case "reset":
 			user_prefs["audio_quality"] = default_prefs["audio_quality"]
 			save_preferences()
 			print(f"{SAVED} Preference cleared.\n")
 
-		case "b" | "B" | '' | None:
+		case "back":
 			pass
 
 		case _:  # Returned a valid quality enum
