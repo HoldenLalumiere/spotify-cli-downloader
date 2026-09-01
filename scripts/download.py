@@ -183,7 +183,7 @@ class DownloadProcessor:
 			case DuplicateCheckMode.WORKING_FOLDER:
 				existing_file_index = _build_file_index(self.collection_path)
 			case DuplicateCheckMode.DO_NOT_CHECK:
-				existing_file_index = set()
+				existing_file_index = {}
 
 		_get_stream_session(self.verbosity)
 
@@ -195,6 +195,7 @@ class DownloadProcessor:
 		download_count = 0
 		processed_count = 0
 		self.filename_lookup = {}
+		self.m3u_path_overrides = {}
 		try:
 			for index, metadata in download_order:
 				processed_count += 1
@@ -202,9 +203,15 @@ class DownloadProcessor:
 				self.filename_lookup[metadata["id"]] = formatted_filename
 
 				# Check if the file is already downloaded
-				already_downloaded = (metadata["artist"], metadata["title"]) in existing_file_index
+				dupe_key = (metadata["artist"], metadata["title"])
+				already_downloaded = dupe_key in existing_file_index
 
 				if already_downloaded:
+					if self.settings.generate_m3u:
+						existing_path = existing_file_index[dupe_key]
+						if os.path.dirname(existing_path) != self.collection_path:
+							self.m3u_path_overrides[metadata["id"]] = existing_path
+
 					if self.verbosity != AppVerbosity.LOW:
 						print(f"{c.magenta(f"[{processed_count:>{width}}/{total_tracks}]")} Skipping: {metadata['artist']} - {metadata['title']}")
 					else:
@@ -237,7 +244,7 @@ class DownloadProcessor:
 						time.sleep(long_break)
 
 			if self.settings.generate_m3u:
-				generate_m3u(collection_name, metadata_list, self.collection_path, self.file_ext, self.filename_lookup)
+				generate_m3u(collection_name, metadata_list, self.collection_path, self.file_ext, self.filename_lookup, self.m3u_path_overrides)
 				if self.verbosity != AppVerbosity.LOW:
 					print(f"{SUCC} M3U playlist created.")
 		finally:
@@ -508,9 +515,9 @@ def _verify_file_integrity(filepath):
 
 
 def _build_file_index(download_dir):
-	"""Walks all folders under download_dir and returns the set of (artist, title) tuples
-	for already downloaded items based on file metadata."""
-	existing_items = set()
+	"""Walks all folders under download_dir and returns a dict mapping (artist, title)
+	to the full filepath of the already-downloaded file, based on file metadata."""
+	existing_items = {}
 	for root, _dirs, files in os.walk(download_dir):
 		for filename in files:
 			filepath = os.path.join(root, filename)
@@ -518,7 +525,7 @@ def _build_file_index(download_dir):
 				continue
 			item_metadata = _read_track_metadata(filepath)
 			if item_metadata:
-				existing_items.add(item_metadata)
+				existing_items[item_metadata] = filepath
 	return existing_items
 
 
