@@ -150,6 +150,7 @@ class DownloadProcessor:
 
 					self.file_ext = self.settings.audio_format.ext.lower().strip()
 					self.filename_lookup = {metadata["id"]: format_custom_filename(self.settings.filename_format, metadata)}
+					self.collection_path = download_dir
 
 					_get_stream_session(self.verbosity)
 					print(f"Downloading: {super_title} - {metadata["title"]}")
