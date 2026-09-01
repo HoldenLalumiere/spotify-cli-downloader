@@ -17,7 +17,6 @@ import imageio_ffmpeg
 from dotenv import load_dotenv
 from email.mime.image import MIMEImage
 
-from librespot import metadata
 from scripts.config import AppAudioFormat, DuplicateCheckMode
 from spotipy.exceptions import SpotifyException
 from scripts.m3u_generator import generate_m3u
@@ -296,9 +295,7 @@ class DownloadProcessor:
 			os.replace(temp_ogg_filename, final_filename)
 		else:
 			try:
-				result = subprocess.run(
-					[_FFMPEG_PATH, "-y", "-i", temp_ogg_filename, final_filename], capture_output=True
-				)
+				result = subprocess.run([_FFMPEG_PATH, "-y", "-i", temp_ogg_filename, final_filename], capture_output=True)
 				if result.returncode != 0:
 					raise Exception(f"{WARN} FFmpeg failed with code {result.returncode}")
 			except Exception as e:
