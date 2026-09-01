@@ -347,6 +347,13 @@ class DownloadProcessor:
 			for meta_key, id3_key in id3_metadata_map.items():
 				if metadata.get(meta_key):
 					audio[id3_key] = str(metadata[meta_key])
+
+			# ID3 combines track number and total tracks into track number / total tracks
+			if metadata.get("tracknumber"):
+				if metadata.get("totaltracks"):
+					audio["tracknumber"] = f"{metadata['tracknumber']}/{metadata['totaltracks']}"
+				else:
+					audio["tracknumber"] = metadata["tracknumber"]
 		elif ext == AppAudioFormat.M4A.ext:
 			# Map program metadata names to MP4 atom keys
 			mp4_metadata_map = {
@@ -364,7 +371,8 @@ class DownloadProcessor:
 			# TODO possibly store the total number of tracks/disks so this can be saved properly
 			if metadata.get("tracknumber"):
 				try:
-					audio["trkn"] = [(int(metadata["tracknumber"]), 0)]
+					total_tracks = int(metadata["totaltracks"]) if metadata.get("totaltracks") else 0
+					audio["trkn"] = [(int(metadata["tracknumber"]), total_tracks)]
 				except ValueError:
 					pass
 			if metadata.get("discnumber"):
@@ -374,6 +382,8 @@ class DownloadProcessor:
 					pass
 		else:
 			audio.update({k: v for k, v in metadata.items() if k not in ["id", "image_url"]})
+			if metadata.get("totaltracks"):
+				audio["tracktotal"] = metadata["totaltracks"]
 
 		audio.save()
 
@@ -513,25 +523,32 @@ def _build_file_index(download_dir):
 	return existing_items
 
 
-def _build_item_metadata(track_data, collection_name, release_date, image_url):
+def _build_item_metadata(track_data, collection_name, release_date, image_url, total_tracks):
 	"""Formats track or episode data into a standardized metadata dictionary."""
 	match track_data.get("type"):
 		case "track":
 			artists = track_data.get("artists", [])
 			artist_string = "/".join([artist["name"] for artist in artists]) if artists else "Unknown Artist"
+
+			album_artists = track_data.get("album", {}).get("artists", [])
+			if not album_artists:
+				album_artists = artists
+			album_artist = album_artists[0]["name"] if album_artists else "Unknown Artist"
 		case "episode":
 			show_data = track_data.get("show", {})
 			artist_string = show_data.get("publisher") or show_data.get("name") or "Podcast"
+			album_artist = artist_string
 		case _:
 			raise Exception("Unknown URL type") # This should never happen
 
 	return {
 		"album": collection_name,
 		"artist": artist_string,
-		"albumartist": artist_string, # TODO, check that this works correctly
+		"albumartist": album_artist,
 		"title": track_data["name"],
 		"discnumber": str(track_data.get("disc_number", "")),
 		"tracknumber": str(track_data.get("track_number", "")),
+		"totaltracks": str(total_tracks) if total_tracks else "",
 		"year": release_date.split("-")[0] if release_date and "-" in release_date else "Unknown",
 		"id": track_data["id"],
 		"image_url": image_url
@@ -550,6 +567,7 @@ def _get_item_metadata(url, url_type):
 			collection_name = album_data.get("name", "Unknown Album")
 			release_date = album_data.get("release_date", "Unknown Date")
 			images = album_data.get("images", [])
+			total_tracks = album_data.get("total_tracks", 0)
 
 		case "episode":
 			data = _safe_api_call(SC.episode, item_id)
@@ -558,11 +576,12 @@ def _get_item_metadata(url, url_type):
 			collection_name = show_data.get("name", "Unknown Podcast")
 			release_date = data.get("release_date", "Unknown Date")
 			images = data.get("images", [])
+			total_tracks = 0
 		case _:
 			raise Exception("Unknown URL type") # This should never happen
 
 	image_url = images[0]["url"] if images else None
-	return _build_item_metadata(data, collection_name, release_date, image_url)
+	return _build_item_metadata(data, collection_name, release_date, image_url, total_tracks)
 
 
 def _get_collection_metadata(url, url_type):
@@ -577,6 +596,7 @@ def _get_collection_metadata(url, url_type):
 			release_date = collection_data["release_date"]
 			images = collection_data.get("images", [])
 			image_url = images[0]["url"] if images else None
+			total_tracks = collection_data.get("total_tracks", 0)
 
 			tracks_payload = collection_data.get("tracks", {})
 
@@ -603,6 +623,7 @@ def _get_collection_metadata(url, url_type):
 		match url_type:
 			case "album":
 				track_data = item
+				track_total_tracks = total_tracks
 
 			case "playlist":
 				if not item.get("item"):
@@ -614,8 +635,9 @@ def _get_collection_metadata(url, url_type):
 				release_date = track_album.get("release_date", "Unknown Date")
 				images = track_album.get("images", [])
 				image_url = images[0]["url"] if images else None
+				track_total_tracks = track_album.get("total_tracks", 0)
 
-		track_metadata = _build_item_metadata(track_data, album_name, release_date, image_url)
+		track_metadata = _build_item_metadata(track_data, album_name, release_date, image_url, track_total_tracks)
 		metadata_list.append(track_metadata)
 
 	return metadata_list, collection_name
