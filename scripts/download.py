@@ -367,8 +367,7 @@ class DownloadProcessor:
 				if metadata.get(meta_key):
 					audio[atom_key] = [str(metadata[meta_key])]
 
-			# Track/disc numbers are (number, total) tuples in MP4: total is unknown right now, so use 0
-			# TODO possibly store the total number of tracks/disks so this can be saved properly
+			# TODO Disc total is unknown, so we default to 0. see if this is possible to calculate
 			if metadata.get("tracknumber"):
 				try:
 					total_tracks = int(metadata["totaltracks"]) if metadata.get("totaltracks") else 0
