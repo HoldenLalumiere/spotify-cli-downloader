@@ -7,6 +7,7 @@ import base64
 import random
 import spotipy
 import logging
+import tempfile
 import requests
 import threading
 import subprocess
@@ -17,7 +18,7 @@ from dotenv import load_dotenv
 from email.mime.image import MIMEImage
 
 from librespot import metadata
-from scripts.config import AppAudioFormat
+from scripts.config import AppAudioFormat, DuplicateCheckMode
 from spotipy.exceptions import SpotifyException
 from scripts.m3u_generator import generate_m3u
 from scripts.utils import sanitize_filename, format_custom_filename, _get_url_id
@@ -34,7 +35,6 @@ from mutagen.mp3 import MP3
 from scripts.constants import c, SAVED, ERROR, WARN, SUCC, WAIT
 from scripts.preference_manager import AppVerbosity
 
-# TODO when getting the 403 error for someone elses playlist, print a message that the playlist must be made by you
 # TODO add in extra prints if high verbosity
 # TODO add lyric download and metadata addition
 # TODO look into extra M3U complexities to see if they should be added
@@ -177,8 +177,13 @@ class DownloadProcessor:
 
 		self.file_ext = self.settings.audio_format.ext.lower().strip()
 
-		search_root = download_dir if self.settings.check_all_folders else self.collection_path
-		existing_file_index = _build_file_index(search_root)
+		match self.settings.duplicate_check_mode:
+			case DuplicateCheckMode.ALL_FOLDERS:
+				existing_file_index = _build_file_index(download_dir)
+			case DuplicateCheckMode.WORKING_FOLDER:
+				existing_file_index = _build_file_index(self.collection_path)
+			case DuplicateCheckMode.DO_NOT_CHECK:
+				existing_file_index = set()
 
 		_get_stream_session(self.verbosity)
 
@@ -273,7 +278,11 @@ class DownloadProcessor:
 					return False
 
 		formatted_filename = self.filename_lookup[metadata["id"]]
-		temp_ogg_filename = f"{metadata['title']}_temp{AppAudioFormat.OGG.ext}" #TODO save as .file so the user does not see it?
+
+		# Create a temp file in the working directory
+		temp_fd, temp_ogg_filename = tempfile.mkstemp(suffix=AppAudioFormat.OGG.ext, dir=self.collection_path)
+		os.close(temp_fd)
+
 		final_filename = f"{formatted_filename}{self.file_ext}"
 
 		with open(temp_ogg_filename, "wb") as f:
@@ -283,7 +292,7 @@ class DownloadProcessor:
 			if self.file_ext != AppAudioFormat.OGG.ext:
 				print(f"{WARN} ffmpeg unavailable. Defaulting to {AppAudioFormat.OGG.ext} instead of {self.file_ext}.")
 				final_filename = f"{formatted_filename}{AppAudioFormat.OGG.ext}"
-			os.rename(temp_ogg_filename, final_filename)
+			os.replace(temp_ogg_filename, final_filename)
 		else:
 			try:
 				result = subprocess.run(
@@ -294,7 +303,7 @@ class DownloadProcessor:
 			except Exception as e:
 				print(f"{ERROR} Transcoding failed: {e}. Defaulting to original OGG container.")
 				final_filename = f"{formatted_filename}{AppAudioFormat.OGG.ext}"
-				os.rename(temp_ogg_filename, final_filename)
+				os.replace(temp_ogg_filename, final_filename)
 			finally:
 				if os.path.exists(temp_ogg_filename):
 					os.remove(temp_ogg_filename)
@@ -664,6 +673,7 @@ def _safe_api_call(api_func, *args, **kwargs):
 				continue
 			elif e.http_status == 403:
 				print(f"{ERROR} 403 Forbidden when calling '{api_func.__name__}'.")
+				print(f"{ERROR} This usually means the playlist isn't yours. Spotify only allows full access to playlists you created or can edit.")
 				print(f"Details: {e.msg}")
 				raise e
 			else:

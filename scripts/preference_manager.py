@@ -1,7 +1,7 @@
 import json
 import os
 
-from scripts.config import AppAudioFormat, AppAudioQuality, AppVerbosity
+from scripts.config import AppAudioFormat, AppAudioQuality, AppVerbosity, DuplicateCheckMode
 from scripts.constants import ERROR
 
 ### Global Variables ###
@@ -11,14 +11,14 @@ user_prefs = {}
 
 # Default preferences
 default_prefs = {
-    "download_dir":      None,
-    "audio_format":      None,
-    "audio_quality":     None,
-	"bypass_main_menu":  False,
-	"verbosity":         AppVerbosity.MEDIUM,
-	"check_all_folders": False,
-	"generate_m3u":      False,
-	"filename_format":   "|title|",
+    "download_dir":         None,
+    "audio_format":         None,
+    "audio_quality":        None,
+	"bypass_main_menu":     False,
+	"verbosity":            AppVerbosity.MEDIUM,
+	"duplicate_check_mode": DuplicateCheckMode.WORKING_FOLDER,
+	"generate_m3u":         False,
+	"filename_format":      "|title|",
 }
 
 def load_preferences():
@@ -73,6 +73,13 @@ def load_preferences():
 			# If the JSON file was corrupted, reset it to the default value
 			data["verbosity"] = default_prefs["verbosity"]
 
+	if data.get("duplicate_check_mode") is not None:
+		try:
+			if not isinstance(data["duplicate_check_mode"], DuplicateCheckMode):
+				data["duplicate_check_mode"] = DuplicateCheckMode[data["duplicate_check_mode"]]
+		except (KeyError, ValueError):
+			data["duplicate_check_mode"] = default_prefs["duplicate_check_mode"]
+
 	user_prefs = data
 
 def save_preferences():
@@ -89,6 +96,9 @@ def save_preferences():
 
 	if isinstance(serializable_prefs.get("verbosity"), AppVerbosity):
 		serializable_prefs["verbosity"] = serializable_prefs["verbosity"].name
+
+	if isinstance(serializable_prefs.get("duplicate_check_mode"), DuplicateCheckMode):
+		serializable_prefs["duplicate_check_mode"] = serializable_prefs["duplicate_check_mode"].name
 	# Note: If it is None, it safely stays None (which JSON turns into null)
 
 	with open(CONFIG_FILE, "w") as f:

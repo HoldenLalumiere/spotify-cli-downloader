@@ -3,7 +3,7 @@ import sys
 import textwrap
 
 from scripts.download import download_url
-from scripts.config import AUDIO_FORMAT_MAP, AUDIO_QUALITY_MAP, VERBOSITY_MAP
+from scripts.config import AUDIO_FORMAT_MAP, AUDIO_QUALITY_MAP, VERBOSITY_MAP, DuplicateCheckMode, DUPLICATE_CHECK_MAP
 from scripts.preference_manager import save_preferences, user_prefs, default_prefs
 from scripts.constants import c, SAVED, ERROR, WARN, SUCC
 from dataclasses import dataclass
@@ -20,12 +20,12 @@ if sys.platform == "win32":
 # TODO add in user pref, if file exists with different ext, replace, download, or skip (default is to skip)
 @dataclass
 class DownloadSettings:
-	download_dir:      str
-	audio_format:      str
-	audio_quality:     str
-	check_all_folders: bool
-	generate_m3u:      bool
-	filename_format:   str
+	download_dir:         str
+	audio_format:         str
+	audio_quality:        str
+	duplicate_check_mode: DuplicateCheckMode
+	generate_m3u:         bool
+	filename_format:      str
 
 
 def print_default_invalid_input():
@@ -170,11 +170,11 @@ def handle_pre_download_menu():
 		if result == "back": return
 		audio_quality = result
 
-	check_all_folders = user_prefs["check_all_folders"]
+	duplicate_check_mode = user_prefs["duplicate_check_mode"]
 	generate_m3u = user_prefs["generate_m3u"]
 	filename_format = user_prefs["filename_format"]
 
-	download_settings = DownloadSettings(download_dir, audio_format, audio_quality, check_all_folders, generate_m3u, filename_format) #TODO look into these yellow lines
+	download_settings = DownloadSettings(download_dir, audio_format, audio_quality, duplicate_check_mode, generate_m3u, filename_format) #TODO look into these yellow lines
 	handle_download_menu(download_settings)
 
 def print_download_menu(settings):
@@ -212,24 +212,44 @@ def handle_download_menu(settings):
 
 
 def print_preferences_menu():
-	#TODO add in the current preferences printed on the side in cyan
-	menu_text = textwrap.dedent(f"""
-			--- {c.blue("Change/Set Preferences", b=True)} ---
-			If a preference is set here, when downloading, the preference will be used
-			as the default value and you will not be asked for it as input
-			\t1. Download Location
-			\t2. Audio Format
-			\t3. Audio Quality
-			\t4. Toggle Main Menu Bypass (Start in Download Menu)
-			\t5. Verbosity
-			\t6. Duplicate Checking
-			\t7. Toggle Generate M3U Playlist
-			\t8. Change Filename Format
-			\t9. Spotify API Credentials (.env)
-			\t0. {c.red("Spotify session stuff (might happen naturally)")}
-			\tr. {c.red("TODO add reset all functionality")}
-			\tb. Back""").strip()
-	print(menu_text)
+	download_dir = user_prefs["download_dir"] or "Not Set"
+	if len(download_dir) > 30:
+		download_dir = f"...{download_dir[-27:]}"
+
+	audio_format_label = user_prefs["audio_format"].label if user_prefs["audio_format"] else "Not Set"
+	audio_quality_label = user_prefs["audio_quality"].label if user_prefs["audio_quality"] else "Not Set"
+	verbosity_label = user_prefs["verbosity"].label if user_prefs["verbosity"] else "Not Set"
+	bypass_label = "On" if user_prefs["bypass_main_menu"] else "Off"
+	duplicate_check_label = user_prefs["duplicate_check_mode"].label
+	m3u_label = "On" if user_prefs["generate_m3u"] else "Off"
+	filename_format_label = user_prefs["filename_format"]
+
+	options = [
+		("1. Download Location", download_dir),
+		("2. Audio Format", audio_format_label),
+		("3. Audio Quality", audio_quality_label),
+		("4. Toggle Main Menu Bypass", bypass_label),
+		("5. Verbosity", verbosity_label),
+		("6. Duplicate Checking", duplicate_check_label),
+		("7. Toggle Generate M3U Playlist", m3u_label),
+		("8. Change Filename Format", filename_format_label),
+	]
+	widest_option = max(len(label) for label, _ in options)
+
+	menu_lines = [
+		f"--- {c.blue("Change/Set Preferences", b=True)} ---",
+		"If a preference is set here, when downloading, the preference will be used",
+		"as the default value and you will not be asked for it as input",
+	]
+	for label, value in options:
+		menu_lines.append(f"\t{label:<{widest_option}}  {c.cyan(value)}")
+
+	menu_lines.append(f"\t9. Spotify API Credentials (.env)")
+	menu_lines.append(f"\t0. {c.red("Spotify session stuff (might happen naturally)")}")
+	menu_lines.append(f"\tr. {c.red("TODO add reset all functionality")}")
+	menu_lines.append("\tb. Back")
+
+	print(textwrap.dedent("\n".join(menu_lines)).strip())
 
 def handle_preferences_menu():
 	while True:
@@ -450,18 +470,17 @@ def handle_verbosity_menu():
 				print_default_invalid_input()
 
 def print_duplicate_check_menu():
-	curr_label = "Checking all folders" if user_prefs["check_all_folders"] else "Checking current folder only"
-	menu_text = textwrap.dedent(f"""
-			--- {c.blue("Change Duplicate Checking Preference", b=True)} ---
-			Current Preference: {c.cyan(curr_label)}
-			If on, downloads are skipped if the track already exists
-			anywhere under your download directory, not just the
-			current album/playlist's folder
-			\t1. Check All Folders
-			\t2. Check Working Folder
-			\tr. Reset Preference
-			\tb. Back""").strip()
-	print(menu_text)
+	curr_label = user_prefs["duplicate_check_mode"].label
+	menu_lines = [
+		f"--- {c.blue("Change Duplicate Checking Preference", b=True)} ---",
+		f"Current Preference: {c.cyan(curr_label)}"
+	]
+	for num, mode_enum in DUPLICATE_CHECK_MAP.items():
+		menu_lines.append(f"\t{num}. {mode_enum.label} - {mode_enum.description}")
+	menu_lines.append("\tr. Reset Preference")
+	menu_lines.append("\tb. Back")
+
+	print(textwrap.dedent("\n".join(menu_lines)).strip())
 
 def handle_duplicate_check_menu():
 	while True:
@@ -469,22 +488,16 @@ def handle_duplicate_check_menu():
 		choice = input("> ").strip()
 
 		match choice:
-			case "1":
-				user_prefs["check_all_folders"] = True
+			case _ if choice in DUPLICATE_CHECK_MAP:
+				user_prefs["duplicate_check_mode"] = DUPLICATE_CHECK_MAP[choice]
 				save_preferences()
-				print(f"{SAVED} Updated to check all folders.\n")
-				break
-
-			case "2":
-				user_prefs["check_all_folders"] = False
-				save_preferences()
-				print(f"{SAVED} Updated to check working folder.\n")
+				print(f"{SAVED} Duplicate checking updated to {DUPLICATE_CHECK_MAP[choice].label}.\n")
 				break
 
 			case "r" | "R":
-				user_prefs["check_all_folders"] = default_prefs["check_all_folders"]
+				user_prefs["duplicate_check_mode"] = default_prefs["duplicate_check_mode"]
 				save_preferences()
-				print(f"{SAVED} Preference cleared (set to check working folder).\n")
+				print(f"{SAVED} Preference cleared (set to {default_prefs['duplicate_check_mode'].label}).\n")
 				break
 
 			case "b" | "B" | "" | None:

@@ -66,3 +66,22 @@ VERBOSITY_MAP = {
     "2": AppVerbosity.MEDIUM,
     "3": AppVerbosity.HIGH,
 }
+
+
+### Duplicate Checking Levels ###
+class DuplicateCheckMode(Enum):
+	# Value format: (label, description)
+	ALL_FOLDERS     = ("All Folders",    "Skip if the track exists anywhere under your download directory")
+	WORKING_FOLDER  = ("Working Folder", "Skip only if the track exists in the current album/playlist's folder")
+	DO_NOT_CHECK    = ("Do Not Check",   "Always download, overwriting any existing file")
+
+	def __init__(self, label, description):
+		self.label = label
+		self.description = description
+
+# Used for the UI only
+DUPLICATE_CHECK_MAP = {
+	"1": DuplicateCheckMode.ALL_FOLDERS,
+	"2": DuplicateCheckMode.WORKING_FOLDER,
+	"3": DuplicateCheckMode.DO_NOT_CHECK,
+}
