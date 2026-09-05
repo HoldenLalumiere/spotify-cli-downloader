@@ -31,7 +31,7 @@ from mutagen.mp4 import MP4, MP4Cover
 from mutagen.easyid3 import EasyID3
 from mutagen.id3 import ID3NoHeaderError, ID3, APIC
 from mutagen.mp3 import MP3
-from scripts.constants import c, SAVED, ERROR, WARN, SUCC, WAIT
+from scripts.constants import c, SAVED, ERROR, WARN, SUCC, WAIT, CACHE_FILE, ENV_FILE, CREDENTIALS_FILE
 from scripts.preference_manager import AppVerbosity
 
 # TODO add in extra prints if high verbosity
@@ -43,15 +43,12 @@ from scripts.preference_manager import AppVerbosity
 # TODO look into pytyhon requirement version for consistency
 def init_spotify_cred():
 	"""Initializes Spotipy with user authentication credentials."""
-	project_root = os.path.dirname(os.path.abspath(__file__))
-	cache_path = os.path.join(project_root, "../.cache")
-
 	return spotipy.Spotify(auth_manager=SpotifyOAuth(
 			client_id=os.getenv("SPOTIPY_CLIENT_ID"),
 			client_secret=os.getenv("SPOTIPY_CLIENT_SECRET"),
 			redirect_uri=os.getenv("SPOTIPY_REDIRECT_URI"),
 			scope="playlist-read-private",
-			cache_path=cache_path
+			cache_path=CACHE_FILE
 	))
 
 
@@ -69,13 +66,17 @@ def _verify_ffmpeg_available():
 
 ### Global variables ###
 # Load vars from .env system memory
-load_dotenv()
+load_dotenv(dotenv_path=ENV_FILE)
 # Set up Spotify API listening credentials
 SPOTIFY_STREAM_SESSION = None
 SC = None
 # FFmpeg
 _FFMPEG_PATH = _verify_ffmpeg_available()
-
+# librespot
+_SESSION_CONF = Session.Configuration.Builder() \
+	.set_store_credentials(True) \
+	.set_stored_credential_file(CREDENTIALS_FILE) \
+	.build()
 
 #TODO add this line in if first time `logging.basicConfig(level=logging.DEBUG)`
 #TODO force the same python packages for all
@@ -89,16 +90,7 @@ def _get_stream_session(verbosity):
 		if verbosity != AppVerbosity.LOW:
 			print(f"{WAIT} Establishing active Spotify streaming connection...")
 
-		auth_token = _get_auth_token()
-		if auth_token:
-			# logging.basicConfig(level=logging.DEBUG) #TODO activate this if credentials.json does not exist, also give auth_token of none, then restart download
-			# Pass the Spotipy token into the librespot session builder
-
-			# SPOTIFY_STREAM_SESSION = Session.Builder().oauth(None).create()
-			SPOTIFY_STREAM_SESSION = Session.Builder().oauth(auth_token).create()
-		else:
-			# Fallback as unauthenticated if no token is passed
-			SPOTIFY_STREAM_SESSION = Session.Builder().oauth(None).create()
+		SPOTIFY_STREAM_SESSION = Session.Builder(_SESSION_CONF).stored_file().create()
 
 		if verbosity != AppVerbosity.LOW:
 			print(f"{SUCC} Connection established.")
@@ -107,8 +99,10 @@ def _get_stream_session(verbosity):
 
 def _get_auth_token():
 	try:
-		token_info = SC.auth_manager.get_access_token(as_dict=True)
-		return token_info["access_token"] if token_info else None
+		token_info = SC.auth_manager.get_access_token(as_dict=False)
+		if isinstance(token_info, dict):
+			return token_info.get("access_token")
+		return token_info
 	except Exception:
 		return None
 

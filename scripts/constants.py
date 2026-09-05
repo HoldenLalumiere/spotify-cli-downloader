@@ -1,3 +1,13 @@
+import os
+
+
+_PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
+AUTH_DIR = os.path.join(_PROJECT_ROOT, "..", ".auth")
+ENV_FILE = os.path.join(AUTH_DIR, ".env")
+CACHE_FILE = os.path.join(AUTH_DIR, ".cache")
+CREDENTIALS_FILE = os.path.join(AUTH_DIR, "credentials.json")
+
+
 class ColorPainter:
     def __init__(self):
         # Mapping of numerical ANSI string codes

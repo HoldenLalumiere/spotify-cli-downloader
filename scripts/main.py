@@ -1,18 +1,24 @@
 import os
 import sys
 import textwrap
+import webbrowser
 
-from scripts.download import download_url
+from dotenv import load_dotenv
+from librespot.core import Session
+from scripts.download import download_url, init_spotify_cred
 from scripts.config import AUDIO_FORMAT_MAP, AUDIO_QUALITY_MAP, VERBOSITY_MAP, DuplicateCheckMode, DUPLICATE_CHECK_MAP
 from scripts.preference_manager import save_preferences, user_prefs, default_prefs
-from scripts.constants import c, SAVED, ERROR, WARN, SUCC
+from scripts.constants import c, SAVED, ERROR, WARN, SUCC, ENV_FILE, CACHE_FILE, CREDENTIALS_FILE
 from dataclasses import dataclass
 from scripts.credential_manager import save_to_env
 from scripts.utils import VALID_FILENAME_KEYWORDS, is_valid_filename_pattern, is_valid_directory_path, \
 	is_valid_spotify_hex, is_valid_url, is_valid_spotify_url
 
+
 if sys.platform == "win32":
 	os.system("color")
+
+_AUTH_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".auth")
 
 # TODO ensure all prints end in a `.`
 # TODO implement an h option which will print what the setting does
@@ -662,10 +668,11 @@ def print_id_credentials_help(): #TODO figure out why this only uses 1 tab, for 
 def print_secret_credentials_help():
 	print("Click `View client secret`")
 
-#TODO add a print out that the user must click a link after starting for first time (if .cache does not exitst)
+#TODO add a print out that the user must click a link after starting for first time (if .cache does not exist)
 #TODO update env vars after creating the env file
 #TODO modify this menu so that the user selects each thing to set if not the first time?
 def handle_credentials_menu():
+	""""""
 	result = handle_id_credentials_menu()
 	if result == "back": return
 
@@ -675,7 +682,11 @@ def handle_credentials_menu():
 	result = handle_redirect_credentials_menu()
 	if result == "back": return
 
-	print(f"{SAVED} All API Credentials saved") #TODO remove?
+	if os.path.exists(ENV_FILE):
+		return True
+	else:
+		print(f"{ERROR} Setup incomplete: credentials were not saved. Exiting.")
+		return False
 
 def handle_id_credentials_menu():
 	while True:
@@ -734,11 +745,85 @@ def handle_redirect_credentials_menu():
 			case _:
 				print(f"{ERROR} Invalid Redirect URI. Please enter a valid URL (e.g., http://localhost:8080).")
 
+def handle_spotify_login_menu():
+	"""If .cache does not exist, attempt to create it via the user logging into a web browser."""
+	load_dotenv(dotenv_path=ENV_FILE, override=True)
+	try:
+		SC = init_spotify_cred()
+		SC.auth_manager.get_access_token(as_dict=False)
+	except Exception as e:
+		print(f"{ERROR} Spotify login failed: {e}")
+		return False
+	return True
+
+def handle_streaming_login_menu():
+	"""If credentials.json does not exist, run librespot's OAuth flow to create it."""
+	def oauth_url_callback(url):
+		print("Open this URL in your browser to log in for streaming:")
+		print(url)
+		webbrowser.open(url)
+
+	conf = Session.Configuration.Builder() \
+		.set_store_credentials(True) \
+		.set_stored_credential_file(CREDENTIALS_FILE) \
+		.build()
+
+	try:
+		Session.Builder(conf).oauth(oauth_url_callback).create()
+	except Exception as e:
+		print(f"{ERROR} Streaming login failed: {e}")
+		return False
+	return True
+
+def is_first_time_setup():
+	"""Checks if all required auth files have been created."""
+	return not (os.path.exists(ENV_FILE) and os.path.exists(CACHE_FILE) and os.path.exists(CREDENTIALS_FILE))
+
+def run_first_time_setup():
+	""""""
+	print(f"--- {c.blue('First-Time Setup', b=True)} ---")
+
+	if not os.path.exists(ENV_FILE):
+		print("Step 1: Spotify API Credential")
+		handle_credentials_menu()
+		if os.path.exists(ENV_FILE):
+			print(f"{SAVED} Credentials.")
+		else:
+			print(f"{ERROR} Setup incomplete: credentials were not saved. Exiting.")
+			return False
+
+	if not os.path.exists(CACHE_FILE):
+		print("Step 2: Log into Spotify")
+		handle_spotify_login_menu()
+		if os.path.exists(CACHE_FILE):
+			print(f"{SUCC} Spotify login successful.")
+		else:
+			print(f"{ERROR} Setup incomplete: Spotify login did not complete. Exiting.")
+			return False
+
+	if not os.path.exists(CREDENTIALS_FILE):
+		print("Step 3: ")
+		if not handle_streaming_login_menu():
+			return False
+		if os.path.exists(CREDENTIALS_FILE):
+			print(f"{SUCC} Streaming login successful.")
+		else:
+			print(f"{ERROR} Setup incomplete: streaming login did not complete. Exiting.")
+			return False
+
+	print(f"{SAVED} Setup complete.\n")
+	return True
 
 
 #TODO add option to reset credential
 #TODO implement artist support ???
 def get_input():
+	if is_first_time_setup():
+		if not run_first_time_setup():
+			return # Exit program if not fully set up
+			#TODO might want to make this open partially functional program if i implement playlist file creation,
+			# then the user can do playlist creation still w/o full set up.
+
 	if user_prefs["bypass_main_menu"]:
 		handle_pre_download_menu()
 	while True:
