@@ -36,9 +36,11 @@ from scripts.preference_manager import AppVerbosity
 
 # TODO add in extra prints if high verbosity
 # TODO add lyric download and metadata addition
-# TODO look into extra M3U complexities to see if they should be added
-# TODO change album artist to be just the main artist
 # TODO manually generate an M3U for masayoshi and DKC
+# TODO Generate playlist file based on folder
+# TODO Look at duplicate checking to see if there is a more concrete way to check if they are the same audio
+# TODO See if tracks have an associated album
+# TODO look into pytyhon requirement version for consistency
 def init_spotify_cred():
 	"""Initializes Spotipy with user authentication credentials."""
 	project_root = os.path.dirname(os.path.abspath(__file__))
@@ -79,7 +81,7 @@ _FFMPEG_PATH = _verify_ffmpeg_available()
 #TODO force the same python packages for all
 #TODO add blue to main menu
 #TODO work on first time user set up
-#TODO if a file is in another folder, when making the m3u, during skip add it to the m3u
+#TODO if someone Ctrl+C's or exits the program in some way, exit gracefully instead of displaying a code crash
 def _get_stream_session(verbosity):
 	"""Returns the current stream session, or builds a fresh one if dropped/idle."""
 	global SPOTIFY_STREAM_SESSION

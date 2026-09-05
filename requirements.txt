@@ -1,6 +1,6 @@
-spotipy
-python-dotenv
-librespot
-mutagen
-requests
-imageio-ffmpeg
+spotipy==2.26.0
+python-dotenv==1.2.2
+librespot==0.0.10
+mutagen==1.48.1
+requests==2.34.2
+imageio-ffmpeg==0.6.0
