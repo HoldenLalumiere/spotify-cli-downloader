@@ -18,8 +18,6 @@ from scripts.utils import VALID_FILENAME_KEYWORDS, is_valid_filename_pattern, is
 if sys.platform == "win32":
 	os.system("color")
 
-_AUTH_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".auth")
-
 # TODO ensure all prints end in a `.`
 # TODO implement an h option which will print what the setting does
 # TODO enforce that all printed lines fit in 50 chars (maybe 80)
@@ -668,8 +666,7 @@ def print_id_credentials_help(): #TODO figure out why this only uses 1 tab, for 
 def print_secret_credentials_help():
 	print("Click `View client secret`")
 
-#TODO add a print out that the user must click a link after starting for first time (if .cache does not exist)
-#TODO update env vars after creating the env file
+#TODO update env vars after creating the env file (Is this done, or did I mean a way to update these later)
 #TODO modify this menu so that the user selects each thing to set if not the first time?
 def handle_credentials_menu():
 	""""""

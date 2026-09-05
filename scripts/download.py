@@ -1,24 +1,16 @@
 import os
 import sys
 import time
-import math
-import json
 import base64
 import random
 import spotipy
-import logging
 import tempfile
 import requests
-import threading
 import subprocess
 import imageio_ffmpeg
 
-# from pydub import AudioSegment
 from dotenv import load_dotenv
-from email.mime.image import MIMEImage
-
 from scripts.config import AppAudioFormat, DuplicateCheckMode
-from spotipy.exceptions import SpotifyException
 from scripts.m3u_generator import generate_m3u
 from scripts.utils import sanitize_filename, format_custom_filename, _get_url_id
 from spotipy.oauth2 import SpotifyOAuth
@@ -40,7 +32,6 @@ from scripts.preference_manager import AppVerbosity
 # TODO Generate playlist file based on folder
 # TODO Look at duplicate checking to see if there is a more concrete way to check if they are the same audio
 # TODO See if tracks have an associated album
-# TODO look into pytyhon requirement version for consistency
 def init_spotify_cred():
 	"""Initializes Spotipy with user authentication credentials."""
 	return spotipy.Spotify(auth_manager=SpotifyOAuth(
@@ -78,10 +69,7 @@ _SESSION_CONF = Session.Configuration.Builder() \
 	.set_stored_credential_file(CREDENTIALS_FILE) \
 	.build()
 
-#TODO add this line in if first time `logging.basicConfig(level=logging.DEBUG)`
-#TODO force the same python packages for all
 #TODO add blue to main menu
-#TODO work on first time user set up
 #TODO if someone Ctrl+C's or exits the program in some way, exit gracefully instead of displaying a code crash
 def _get_stream_session(verbosity):
 	"""Returns the current stream session, or builds a fresh one if dropped/idle."""
@@ -97,7 +85,7 @@ def _get_stream_session(verbosity):
 	return SPOTIFY_STREAM_SESSION
 
 
-def _get_auth_token():
+def _get_auth_token(): #TODO is this needed? currently unused.
 	try:
 		token_info = SC.auth_manager.get_access_token(as_dict=False)
 		if isinstance(token_info, dict):
