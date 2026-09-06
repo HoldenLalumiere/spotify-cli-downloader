@@ -1,5 +1,5 @@
-#!/bin/python3
-
+import contextlib
+import io
 import os
 import sys
 import time
@@ -71,8 +71,8 @@ _SESSION_CONF = Session.Configuration.Builder() \
 	.set_stored_credential_file(CREDENTIALS_FILE) \
 	.build()
 
+
 #TODO add blue to main menu
-#TODO if someone Ctrl+C's or exits the program in some way, exit gracefully instead of displaying a code crash
 def _get_stream_session(verbosity):
 	"""Returns the current stream session, or builds a fresh one if dropped/idle."""
 	global SPOTIFY_STREAM_SESSION
@@ -86,6 +86,18 @@ def _get_stream_session(verbosity):
 			print(f"{SUCC} Connection established.")
 	return SPOTIFY_STREAM_SESSION
 
+
+def _suppress_librespot_noise(func, *args, **kwargs):
+	"""Runs func with stdout captured, filtering out librespot's own noisy prints
+	while still surfacing everything else."""
+	buf = io.StringIO()
+	with contextlib.redirect_stdout(buf):
+		result = func(*args, **kwargs)
+	output = buf.getvalue()
+	for line in output.splitlines():
+		if "Failed reading packet" not in line and "Failed to receive packet" not in line:
+			print(line)
+	return result
 
 class DownloadProcessor:
 	"""Handles the lifecycle of a download request."""
@@ -183,7 +195,7 @@ class DownloadProcessor:
 							self.m3u_path_overrides[metadata["id"]] = existing_path
 
 					if self.verbosity != AppVerbosity.LOW:
-						print(f"{c.magenta(f"[{processed_count:>{width}}/{total_tracks}]")} Skipping: {metadata['artist']} - {metadata['title']}")
+						print(f"{c.magenta(f"[{processed_count:>{width}}/{total_tracks}]")} Skipping: {formatted_filename}") #TODO add a pref for if you want the prints to match your custom filename or the default {metadata['artist']} - {metadata['title']}
 					else:
 						self.update_download_progress(index, total_tracks, metadata)
 					continue
@@ -237,7 +249,8 @@ class DownloadProcessor:
 		audio_key_delay = 2
 		for attempt in range(audio_key_retries):
 			try:
-				stream = _safe_api_call(
+				stream = _suppress_librespot_noise(
+					_safe_api_call,
 					session.content_feeder().load,
 					item_id,
 					VorbisOnlyAudioQuality(self.settings.audio_quality.librespot_quality),
@@ -642,7 +655,7 @@ def _safe_api_call(api_func, *args, **kwargs):
 	"""Wraps network calls to handle Spotify rate limits (429) and access denial (403)."""
 	retries = 5
 	delay = 2
-	for i in range(retries):
+	for _ in range(retries):
 		try:
 			return api_func(*args, **kwargs)
 		except spotipy.exceptions.SpotifyException as e:
@@ -658,12 +671,9 @@ def _safe_api_call(api_func, *args, **kwargs):
 				print(f"{ERROR} 403 Forbidden when calling '{api_func.__name__}'.")
 				print(f"{ERROR} This usually means the playlist isn't yours. Spotify only allows full access to playlists you created or can edit.")
 				print(f"Details: {e.msg}")
-				raise e
+				raise
 			else:
-				raise e
-		except Exception as e:
-			# Catch general connection/network issues
-			raise e #TODO should this be catching the error and then throwing it?
+				raise
 	raise Exception("Max retries exceeded due to rate limiting.")
 
 

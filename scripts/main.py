@@ -1,3 +1,4 @@
+#!/bin/python3
 import os
 import sys
 import textwrap
@@ -818,29 +819,33 @@ def run_first_time_setup():
 #TODO add option to reset credential
 #TODO implement artist support ???
 def get_input():
-	if is_first_time_setup():
-		if not run_first_time_setup():
-			return # Exit program if not fully set up
-			#TODO might want to make this open partially functional program if i implement playlist file creation,
-			# then the user can do playlist creation still w/o full set up.
+	try:
+		if is_first_time_setup():
+			if not run_first_time_setup():
+				return # Exit program if not fully set up
+				#TODO might want to make this open partially functional program if i implement playlist file creation,
+				# then the user can do playlist creation still w/o full set up.
 
-	if user_prefs["bypass_main_menu"]:
-		handle_pre_download_menu()
-	while True:
-		print_main_options()
-		choice = input("> ").strip()
+		if user_prefs["bypass_main_menu"]:
+			handle_pre_download_menu()
+		while True:
+			print_main_options()
+			choice = input("> ").strip()
 
-		match choice:
-			case "1":
-				handle_pre_download_menu()
-			case "2":
-				handle_preferences_menu()
-			case "b":
-				print("Exiting...")
-				break
-			case _:
-					print_default_invalid_input()
-
+			match choice:
+				case "1":
+					handle_pre_download_menu()
+				case "2":
+					handle_preferences_menu()
+				case "b":
+					print("Exiting...")
+					break
+				case _:
+						print_default_invalid_input()
+	except (KeyboardInterrupt, EOFError):
+		print(f"\nExiting...")
+	except Exception as e:
+		print(f"You broke me :(\n{e}")
 
 if __name__ == '__main__':
 	get_input()
