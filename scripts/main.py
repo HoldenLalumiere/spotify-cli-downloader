@@ -209,7 +209,10 @@ def handle_download_menu(settings):
 
 			case _ if is_valid_spotify_url(url):
 				print(f"{SUCC} Passed URL verification.")
-				download_url(url, settings, user_prefs["verbosity"])
+				try:
+					download_url(url, settings, user_prefs["verbosity"])
+				except Exception as e:
+					print(f"{ERROR} Download failed: {e}")
 
 			case _:
 				print(f"{ERROR} Failed URL verification. Please enter a well-formed open.spotify.com link.")
@@ -561,7 +564,7 @@ def print_filename_menu():
 			Use \\| to write a literal bar '|' or \\\\ for a literal '\\\\'
 			\th. Help
 			\tr. Reset Preference
-			\tb. Back""").strip()
+			\tb. Back""").strip() #TODO add a line that states that help will show all keywords
 
 	print(menu_text)
 

@@ -1,3 +1,5 @@
+#!/bin/python3
+
 import os
 import sys
 import time
@@ -85,16 +87,6 @@ def _get_stream_session(verbosity):
 	return SPOTIFY_STREAM_SESSION
 
 
-def _get_auth_token(): #TODO is this needed? currently unused.
-	try:
-		token_info = SC.auth_manager.get_access_token(as_dict=False)
-		if isinstance(token_info, dict):
-			return token_info.get("access_token")
-		return token_info
-	except Exception:
-		return None
-
-
 class DownloadProcessor:
 	"""Handles the lifecycle of a download request."""
 
@@ -123,20 +115,14 @@ class DownloadProcessor:
 				os.chdir(download_dir)
 				try:
 					metadata = _get_item_metadata(self.url, url_type)
-					match url_type:
-						case "track":
-							super_title = metadata["album"]
-						case "episode":
-							super_title = metadata["artist"]
-						case _:
-							raise Exception("Unknown URL type") # This should never happen
 
 					self.file_ext = self.settings.audio_format.ext.lower().strip()
 					self.filename_lookup = {metadata["id"]: format_custom_filename(self.settings.filename_format, metadata)}
 					self.collection_path = download_dir
 
 					_get_stream_session(self.verbosity)
-					print(f"Downloading: {super_title} - {metadata["title"]}")
+					formatted_filename = self.filename_lookup[metadata["id"]]
+					print(f"Downloading: {formatted_filename}")
 					self.download_item(metadata, url_type)
 				finally:
 					os.chdir(original_dir)
@@ -203,7 +189,7 @@ class DownloadProcessor:
 					continue
 
 				if self.verbosity != AppVerbosity.LOW:
-					print(f"{c.cyan(f"[{processed_count:>{width}}/{total_tracks}]")} Downloading: {metadata["artist"]} - {metadata["title"]}")
+					print(f"{c.cyan(f"[{processed_count:>{width}}/{total_tracks}]")} Downloading: {formatted_filename}")
 				else:
 					self.update_download_progress(index, total_tracks, metadata)
 
@@ -454,7 +440,8 @@ class DownloadProcessor:
 
 
 		# Overwrite the current terminal line dynamically
-		sys.stdout.write(f"\rDownloading {colored_bar} {percentage_text} {count_text} | {metadata["title"]} - {metadata["artist"]}")
+		formatted_filename = self.filename_lookup[metadata["id"]]
+		sys.stdout.write(f"\rDownloading {colored_bar} {percentage_text} {count_text} | {formatted_filename}")
 		sys.stdout.flush()
 
 		if current == total:
@@ -482,20 +469,6 @@ def _is_valid_audio(filepath):
 		return True
 	except Exception:
 		return False
-
-
-def _verify_file_integrity(filepath):
-	"""Checks if a file exists and can be successfully read/parsed by Mutagen. Deletes if corrupted."""
-	if not os.path.exists(filepath):
-		return False
-	if _is_valid_audio(filepath):
-		return True
-	print(f"\t{WARN} Existing '{os.path.basename(filepath)}' is corrupted. Overwriting...")
-	try:
-		os.remove(filepath)
-	except OSError:
-		pass
-	return False
 
 
 def _build_file_index(download_dir):
@@ -690,7 +663,7 @@ def _safe_api_call(api_func, *args, **kwargs):
 				raise e
 		except Exception as e:
 			# Catch general connection/network issues
-			raise e
+			raise e #TODO should this be catching the error and then throwing it?
 	raise Exception("Max retries exceeded due to rate limiting.")
 
 

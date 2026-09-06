@@ -1,6 +1,6 @@
 # Ignore local runtime configuration and credentials
 config.json
-.auth/*
+.auth
 *.json
 
 # Ignore Python files
