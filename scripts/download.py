@@ -106,6 +106,7 @@ class DownloadProcessor:
 		# Save the dataclass instance containing user choices
 		self.settings = download_settings
 		self.verbosity = verbosity
+		self.succeeded = True
 
 	def start(self):
 		url_type = self.url.split("/")[-2]
@@ -134,13 +135,20 @@ class DownloadProcessor:
 					formatted_filename = self.filename_lookup[metadata["id"]]
 					print(f"Downloading: {formatted_filename}")
 					self.download_item(metadata, url_type)
+				except ConnectionError as e:
+					self.succeeded = False
+					if url_type == "episode":
+						print(f"{ERROR} Podcast episode downloading is currently broken due to an unresolved librespot-python bug.")
+					else:
+						print(f"{ERROR} Download failed: {e}")
 				finally:
 					os.chdir(original_dir)
 
 			case _:
 				raise Exception("Unknown URL type") # This should never happen
 
-		print(f"{SUCC} Download sequence completed.")
+		if self.succeeded:
+			print(f"{SUCC} Download sequence completed.")
 
 	def _download_collection(self, collection_name, metadata_list, download_dir, original_dir):
 		total_tracks = len(metadata_list)
