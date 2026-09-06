@@ -34,15 +34,15 @@ class DownloadSettings:
 
 
 def print_default_invalid_input():
-	print(f"{ERROR} Invalid choice. Please enter a valid option\n")
+	print(f"{ERROR} Invalid choice. Please enter a valid option")
 
 def print_main_options():
 	menu_text = textwrap.dedent(f"""
-			=== Spotify Downloader ===
+			=== {c.blue("Spotify Downloader", b=True)} ===
 			\t1. Download tracks from Spotify
 			\t2. Change/Set Preferences
 			\tb. Exit Program""").strip()
-	print(menu_text)
+	print(f"\n{menu_text}") #TODO make this newline not print on start up (same with the download print if bypass true)
 
 def prompt_download_dir(current_value, is_preference=False):
 	"""Handles the UI and input collection for a download path."""
@@ -60,7 +60,7 @@ def prompt_download_dir(current_value, is_preference=False):
 			"\tb. Back"
 		]
 
-		print(textwrap.dedent("\n".join(menu_lines)).strip())
+		print(f"\n{textwrap.dedent("\n".join(menu_lines)).strip()}")
 		choice = input("> ").strip()
 
 		match choice:
@@ -98,7 +98,7 @@ def prompt_audio_format(current_value, is_preference=False):
 			menu_lines.append(f"\tr. Reset Preference")
 		menu_lines.append("\tb. Back")
 
-		print(textwrap.dedent("\n".join(menu_lines)).strip())
+		print(f"\n{textwrap.dedent("\n".join(menu_lines)).strip()}")
 		choice = input("> ").strip()
 
 		match choice:
@@ -136,7 +136,7 @@ def prompt_audio_quality(current_value, is_preference=False):
 			menu_lines.append("\tr. Reset Preference")
 		menu_lines.append("\tb. Back")
 
-		print(textwrap.dedent("\n".join(menu_lines)).strip())
+		print(f"\n{textwrap.dedent("\n".join(menu_lines)).strip()}")
 		choice = input("> ").strip()
 
 		match choice:
@@ -257,7 +257,7 @@ def print_preferences_menu():
 	menu_lines.append(f"\tr. {c.red("TODO add reset all functionality")}")
 	menu_lines.append("\tb. Back")
 
-	print(textwrap.dedent("\n".join(menu_lines)).strip())
+	print(f"\n{textwrap.dedent("\n".join(menu_lines)).strip()}")
 
 def handle_preferences_menu():
 	while True:
@@ -290,21 +290,6 @@ def handle_preferences_menu():
 				print_default_invalid_input()
 
 
-def print_download_dir_menu():
-	download_dir = user_prefs["download_dir"]
-	if download_dir is None:
-		download_dir = "Not Set"
-	elif len(download_dir) > 40:
-		download_dir = f"...{download_dir[-37:]}"
-
-	menu_lines = textwrap.dedent(f"""
-			--- {c.blue("Change Download Location Preference", b=True)} ---
-			Current Preference: {c.cyan(download_dir)}
-			Enter your preferred download location (full path) or
-			r. Reset Preference
-			b. Back""").strip()
-	print(menu_lines)
-
 def handle_download_dir_menu():
 	result = prompt_download_dir(user_prefs["download_dir"], is_preference=True)
 
@@ -322,21 +307,6 @@ def handle_download_dir_menu():
 			save_preferences()
 			print(f"{SAVED} Download location updated to {result}.\n")
 
-def print_audio_format_menu():
-	curr_enum = user_prefs["audio_format"]
-	curr_label = curr_enum.label if curr_enum else "Not Set"
-	menu_lines = [
-		f"--- {c.blue("Change Audio Format Preference", b=True)} ---",
-		f"Current Preference: {c.cyan(curr_label)}"
-	]
-	for num, format_enum in AUDIO_FORMAT_MAP.items():
-		status = "" if format_enum.implemented else f" - {c.red("not implemented")}"
-		menu_lines.append(f"\t{num}. {format_enum.label} ({c.cyan(format_enum.ext)}){status}")
-	menu_lines.append("\tr. Reset Preference")
-	menu_lines.append("\tb. Back")
-
-	print(textwrap.dedent("\n".join(menu_lines)).strip())
-
 def handle_audio_format_menu():
 	result = prompt_audio_format(user_prefs["audio_format"], is_preference=True)
 
@@ -353,21 +323,6 @@ def handle_audio_format_menu():
 			user_prefs["audio_format"] = result
 			save_preferences()
 			print(f"{SAVED} Audio format updated to {result.label}.\n")
-
-def print_audio_quality_menu():
-	curr_enum = user_prefs["audio_quality"]
-	curr_label = curr_enum.label if curr_enum else "Not Set"
-	menu_lines = [
-		f"--- {c.blue("Change Audio Quality Preference", b=True)} ---",
-		f"Current Preference: {c.cyan(curr_label)}"
-	]
-	for num, quality_enum in AUDIO_QUALITY_MAP.items():
-		status = "" if quality_enum.implemented else f" - {c.red("not implemented")}"
-		menu_lines.append(f"\t{num}. {quality_enum.label} ({c.cyan(quality_enum.kbps)}){status}")
-	menu_lines.append("\tr. Reset Preference")
-	menu_lines.append("\tb. Back")
-
-	print(textwrap.dedent("\n".join(menu_lines)).strip())
 
 def handle_audio_quality_menu():
 	result = prompt_audio_quality(user_prefs["audio_quality"], is_preference=True)
@@ -397,7 +352,7 @@ def print_bypass_menu():
 			\t2. Bypass Off
 			\tr. Reset Preference
 			\tb. Back""").strip()
-	print(menu_text)
+	print(f"\n{menu_text}")
 
 def handle_bypass_menu():
 	while True:
@@ -445,7 +400,7 @@ def print_verbosity_menu():
 	menu_lines.append("\tr. Reset Preference")
 	menu_lines.append("\tb. Back")
 
-	print(textwrap.dedent("\n".join(menu_lines)).strip())
+	print(f"\n{textwrap.dedent("\n".join(menu_lines)).strip()}")
 
 def handle_verbosity_menu():
 	while True:
@@ -488,7 +443,7 @@ def print_duplicate_check_menu():
 	menu_lines.append("\tr. Reset Preference")
 	menu_lines.append("\tb. Back")
 
-	print(textwrap.dedent("\n".join(menu_lines)).strip())
+	print(f"\n{textwrap.dedent("\n".join(menu_lines)).strip()}")
 
 def handle_duplicate_check_menu():
 	while True:
@@ -524,7 +479,7 @@ def print_generate_m3u_menu():
 			\t2. Generate M3U Off
 			\tr. Reset Preference
 			\tb. Back""").strip()
-	print(menu_text)
+	print(f"\n{menu_text}")
 
 def handle_generate_m3u_menu():
 	while True:
@@ -567,7 +522,7 @@ def print_filename_menu():
 			\tr. Reset Preference
 			\tb. Back""").strip() #TODO add a line that states that help will show all keywords
 
-	print(menu_text)
+	print(f"\n{menu_text}")
 
 def handle_filename_menu():
 	while True:
@@ -619,7 +574,7 @@ def print_filename_help():
 		"  Result:  {Theo Katzman} --- 2017 = Hard Work"
 	])
 
-	print(textwrap.dedent("\n".join(menu_lines)).strip())
+	print(f"\n{textwrap.dedent("\n".join(menu_lines)).strip()}")
 
 def print_id_credentials_menu():
 	menu_lines = textwrap.dedent(f"""
@@ -629,20 +584,20 @@ def print_id_credentials_menu():
 			Client ID:
 			h. Help
 			b. Back""").strip()
-	print(menu_lines)
+	print(f"\n{menu_lines}")
 
 def print_secret_credentials_menu():
 	menu_lines = textwrap.dedent(f"""
 			Client Secret:
 			h. Help
 			b. Back""").strip()
-	print(menu_lines)
+	print(f"\n{menu_lines}")
 
 def print_redirect_credentials_menu():
 	menu_lines = textwrap.dedent(f"""
 			Redirect URI:
 			b. Back""").strip()
-	print(menu_lines)
+	print(f"\n{menu_lines}")
 
 def print_id_credentials_help(): #TODO figure out why this only uses 1 tab, for a-e, and none for 1-9
 	print(textwrap.dedent(f"""
@@ -782,7 +737,7 @@ def is_first_time_setup():
 
 def run_first_time_setup():
 	""""""
-	print(f"--- {c.blue('First-Time Setup', b=True)} ---")
+	print(f"\n--- {c.blue('First-Time Setup', b=True)} ---")
 
 	if not os.path.exists(ENV_FILE):
 		print("Step 1: Spotify API Credential")

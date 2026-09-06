@@ -72,7 +72,6 @@ _SESSION_CONF = Session.Configuration.Builder() \
 	.build()
 
 
-#TODO add blue to main menu
 def _get_stream_session(verbosity):
 	"""Returns the current stream session, or builds a fresh one if dropped/idle."""
 	global SPOTIFY_STREAM_SESSION
@@ -121,7 +120,6 @@ class DownloadProcessor:
 				self._download_collection(collection_name, metadata_list, download_dir, original_dir)
 
 			# TODO episode downloading does not work currently
-			# TODO catch/supress this message somehow: Failed reading packet! Failed to receive packet
 			case "track" | "episode":
 				SC = init_spotify_cred()
 				os.chdir(download_dir)
