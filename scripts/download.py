@@ -73,6 +73,9 @@ _SESSION_CONF = Session.Configuration.Builder() \
 	.set_store_credentials(True) \
 	.set_stored_credential_file(CREDENTIALS_FILE) \
 	.build()
+# Download
+_global_download_count = 0
+_next_available_download_time = 0.0
 
 
 def _get_stream_session(verbosity):
@@ -137,6 +140,7 @@ class DownloadProcessor:
 					formatted_filename = self.filename_lookup[metadata["id"]]
 					print(f"Downloading: {formatted_filename}")
 					self.download_item(metadata, url_type)
+					self._calculate_wait_time()
 				except ConnectionError as e:
 					self.succeeded = False
 					if url_type == "episode":
@@ -153,6 +157,7 @@ class DownloadProcessor:
 			print(f"{SUCC} Download sequence completed.")
 
 	def _download_collection(self, collection_name, metadata_list, download_dir, original_dir):
+		global _global_download_count
 		total_tracks = len(metadata_list)
 		width = len(str(total_tracks))
 		safe_collection_name = sanitize_filename(collection_name)
@@ -218,6 +223,7 @@ class DownloadProcessor:
 				if not success:
 					continue
 				download_count += 1
+				self._calculate_wait_time()
 
 				if download_count < total_tracks:
 					# Short delay between each track
@@ -225,13 +231,6 @@ class DownloadProcessor:
 					if self.verbosity == AppVerbosity.HIGH:
 						print(f"\t{WAIT} {sleep_time:.2f} seconds to protect rate limits...")
 					time.sleep(sleep_time)
-
-					# Take a long break every 20 downloads
-					if download_count % 20 == 0:
-						long_break = random.randint(120, 300)  # 2 to 5 minutes
-						if self.verbosity == AppVerbosity.HIGH:
-							print(f"\t{WAIT} {long_break // 60} minutes, downloaded {download_count} tracks...")
-						time.sleep(long_break)
 
 			if self.settings.generate_m3u:
 				generate_m3u(collection_name, metadata_list, self.collection_path, self.file_ext, self.filename_lookup, self.m3u_path_overrides)
@@ -241,6 +240,8 @@ class DownloadProcessor:
 			os.chdir(original_dir) # cd back to the program directory
 
 	def download_item(self, metadata, url_type):
+		self._wait_for_cooldown()
+
 		match url_type:
 			case "track":
 				item_id = TrackId.from_base62(metadata["id"])
@@ -467,6 +468,28 @@ class DownloadProcessor:
 
 		if current == total:
 			print(f"\n{SUCC} All tracks downloaded.")
+
+	def _calculate_wait_time(self):
+		"""Increments the global download counter and, every 20 downloads, schedules a
+		cooldown. The actual wait is deferred: we only sleep for whatever time remains
+		when the next download actually starts, so idle time in menus counts toward it."""
+		global _global_download_count, _next_available_download_time
+		_global_download_count += 1
+
+		if _global_download_count % 20 == 0:
+			long_break = random.randint(120, 300)
+			_next_available_download_time = time.time() + long_break
+			if self.verbosity == AppVerbosity.HIGH:
+				print(f"\t{WAIT} Scheduling a {long_break // 60}-minute cooldown after {_global_download_count} total downloads.")
+
+	def _wait_for_cooldown(self):
+		"""Sleeps only for the time remaining until _next_available_download_time,
+		accounting for time already spent elsewhere (e.g. idle in menus)."""
+		remaining = _next_available_download_time - time.time()
+		if remaining > 0:
+			if self.verbosity != AppVerbosity.LOW:
+				print(f"{WAIT} Waiting {remaining:.0f} more seconds before continuing...")
+			time.sleep(remaining)
 
 
 ### Helper Functions ###
