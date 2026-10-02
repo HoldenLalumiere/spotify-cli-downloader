@@ -31,12 +31,10 @@ from scripts.preference_manager import AppVerbosity
 # TODO add in extra prints if high verbosity
 # TODO add a when to use in the help of the duplicate checker saying that check all should usually be used for playlists and deluxe albums to save storage
 # TODO add lyric download and metadata addition
-# TODO manually generate an M3U for masayoshi and DKC
+# TODO manually generate an M3U for masayoshi
 # TODO Generate playlist file based on folder
 # TODO Look at duplicate checking to see if there is a more concrete way to check if they are the same audio
 # TODO See if tracks have an associated album
-# TODO add in downloading of multiple links at once
-# TODO ask about this error that occurred once: [Error] Download failed: ('Connection broken: IncompleteRead(0 bytes read, 280 more expected)', IncompleteRead(0 bytes read, 280 more expected))
 def init_spotify_cred():
 	"""Initializes Spotipy with user authentication credentials."""
 	return spotipy.Spotify(auth_manager=SpotifyOAuth(

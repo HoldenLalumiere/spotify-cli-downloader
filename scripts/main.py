@@ -203,20 +203,31 @@ def print_download_menu(settings):
 def handle_download_menu(settings):
 	while True:
 		print_download_menu(settings)
-		url = input("> ").strip()
-		match url:
+		raw_input = input("> ").strip()
+
+		match raw_input:
 			case "b" | "B" | "" | None:
 				break
 
-			case _ if is_valid_spotify_url(url):
-				print(f"{SUCC} Passed URL verification.")
-				try:
-					download_url(url, settings, user_prefs["verbosity"])
-				except Exception as e:
-					print(f"{ERROR} Download failed: {e}")
-
 			case _:
-				print(f"{ERROR} Failed URL verification. Please enter a well-formed open.spotify.com link.")
+				urls = [u.strip() for u in raw_input.replace(",", " ").split() if u.strip()] # TODO add a help message stating that multiple links can be handled at once by either space separating them or comma separating them
+				if not urls:
+					print(f"{ERROR} Failed URL verification. Please enter a well-formed open.spotify.com link.")
+					continue
+
+				invalid_urls = [u for u in urls if not is_valid_spotify_url(u)]
+				if invalid_urls:
+					print(f"{ERROR} The following URLs failed verification:")
+					for u in invalid_urls:
+						print(f"  {u}")
+					continue
+
+				print(f"{SUCC} Passed URL verification for {len(urls)} link(s).")
+				for url in urls:
+					try:
+						download_url(url, settings, user_prefs["verbosity"])
+					except Exception as e:
+						print(f"{ERROR} Download failed for {url}: {e}")
 
 
 def print_preferences_menu():
