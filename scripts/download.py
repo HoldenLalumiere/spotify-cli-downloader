@@ -29,11 +29,15 @@ from scripts.constants import c, SAVED, ERROR, WARN, SUCC, WAIT, CACHE_FILE, ENV
 from scripts.preference_manager import AppVerbosity
 
 # TODO add in extra prints if high verbosity
+# TODO add a when to use in the help of the duplicate checker saying that check all should usually be used for playlists and deluxe albums to save storage
 # TODO add lyric download and metadata addition
 # TODO manually generate an M3U for masayoshi and DKC
 # TODO Generate playlist file based on folder
 # TODO Look at duplicate checking to see if there is a more concrete way to check if they are the same audio
 # TODO See if tracks have an associated album
+# TODO ask about this error that occurred once: [Error] Download failed: ('Connection broken: IncompleteRead(0 bytes read, 280 more expected)', IncompleteRead(0 bytes read, 280 more expected))
+# TODO if downloading multiple albums we can get rate limited, i think this is because if all albums are under 20 songs, then they will not trigger the bigger back off, it keep track of this
+# TODO when getting an audio ket fetch fail, it prints `Audio key error, code: 2` twice, we should hide this from the user
 def init_spotify_cred():
 	"""Initializes Spotipy with user authentication credentials."""
 	return spotipy.Spotify(auth_manager=SpotifyOAuth(
@@ -120,7 +124,6 @@ class DownloadProcessor:
 				metadata_list, collection_name = _get_collection_metadata(self.url, url_type)
 				self._download_collection(collection_name, metadata_list, download_dir, original_dir)
 
-			# TODO episode downloading does not work currently
 			case "track" | "episode":
 				SC = init_spotify_cred()
 				os.chdir(download_dir)
@@ -138,7 +141,7 @@ class DownloadProcessor:
 				except ConnectionError as e:
 					self.succeeded = False
 					if url_type == "episode":
-						print(f"{ERROR} Podcast episode downloading is currently broken due to an unresolved librespot-python bug.")
+						print(f"{ERROR} Podcast episode downloading is currently broken due to an unresolved librespot-python bug.") # TODO episode downloading does not work currently work, check if this has been restored
 					else:
 						print(f"{ERROR} Download failed: {e}")
 				finally:
@@ -219,7 +222,7 @@ class DownloadProcessor:
 
 				if download_count < total_tracks:
 					# Short delay between each track
-					sleep_time = random.uniform(2.5, 5.0)
+					sleep_time = random.uniform(5.0, 8.0)
 					if self.verbosity == AppVerbosity.HIGH:
 						print(f"\t{WAIT} {sleep_time:.2f} seconds to protect rate limits...")
 					time.sleep(sleep_time)
@@ -252,7 +255,7 @@ class DownloadProcessor:
 
 		stream = None
 		audio_key_retries = 3
-		audio_key_delay = 2
+		audio_key_delay = 10
 		for attempt in range(audio_key_retries):
 			try:
 				stream = _suppress_librespot_noise(
@@ -268,7 +271,7 @@ class DownloadProcessor:
 				if attempt < audio_key_retries - 1:
 					print(f"\t{WARN} Audio key fetch failed for '{metadata['title']}' (attempt [{attempt + 1}/{audio_key_retries}]). Retrying in {audio_key_delay}s...")
 					time.sleep(audio_key_delay)
-					audio_key_delay *= 2
+					audio_key_delay *= 3
 				else:
 					print(f"\t{ERROR} Skipping '{metadata['title']}': unable to fetch audio key after {audio_key_retries} attempts ({e}).")
 					return False
