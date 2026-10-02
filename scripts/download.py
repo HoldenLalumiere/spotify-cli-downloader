@@ -37,7 +37,6 @@ from scripts.preference_manager import AppVerbosity
 # TODO See if tracks have an associated album
 # TODO ask about this error that occurred once: [Error] Download failed: ('Connection broken: IncompleteRead(0 bytes read, 280 more expected)', IncompleteRead(0 bytes read, 280 more expected))
 # TODO if downloading multiple albums we can get rate limited, i think this is because if all albums are under 20 songs, then they will not trigger the bigger back off, it keep track of this
-# TODO when getting an audio ket fetch fail, it prints `Audio key error, code: 2` twice, we should hide this from the user
 def init_spotify_cred():
 	"""Initializes Spotipy with user authentication credentials."""
 	return spotipy.Spotify(auth_manager=SpotifyOAuth(
@@ -91,14 +90,14 @@ def _get_stream_session(verbosity):
 
 
 def _suppress_librespot_noise(func, *args, **kwargs):
-	"""Runs func with stdout captured, filtering out librespot's own noisy prints
+	"""Runs func with stdout captured, filtering out librespot's prints
 	while still surfacing everything else."""
 	buf = io.StringIO()
 	with contextlib.redirect_stdout(buf):
 		result = func(*args, **kwargs)
 	output = buf.getvalue()
 	for line in output.splitlines():
-		if "Failed reading packet" not in line and "Failed to receive packet" not in line:
+		if "Failed reading packet" not in line and "Failed to receive packet" not in line and "Audio key error" not in line:
 			print(line)
 	return result
 
