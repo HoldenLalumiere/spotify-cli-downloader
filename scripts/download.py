@@ -35,8 +35,8 @@ from scripts.preference_manager import AppVerbosity
 # TODO Generate playlist file based on folder
 # TODO Look at duplicate checking to see if there is a more concrete way to check if they are the same audio
 # TODO See if tracks have an associated album
+# TODO add in downloading of multiple links at once
 # TODO ask about this error that occurred once: [Error] Download failed: ('Connection broken: IncompleteRead(0 bytes read, 280 more expected)', IncompleteRead(0 bytes read, 280 more expected))
-# TODO if downloading multiple albums we can get rate limited, i think this is because if all albums are under 20 songs, then they will not trigger the bigger back off, it keep track of this
 def init_spotify_cred():
 	"""Initializes Spotipy with user authentication credentials."""
 	return spotipy.Spotify(auth_manager=SpotifyOAuth(
@@ -388,7 +388,17 @@ class DownloadProcessor:
 		image_url = metadata["image_url"]
 		if image_url:
 			try:
-				response = requests.get(image_url, timeout=10)
+				response = None
+				for attempt in range(3):
+					try:
+						response = requests.get(image_url, timeout=10)
+						break
+					except requests.exceptions.RequestException as e:
+						if attempt < 2:
+							time.sleep(2 * (attempt + 1))
+						else:
+							raise
+
 				if response.status_code == 200:
 					if ext == AppAudioFormat.MP3.ext:
 						id3 = ID3(filename)
